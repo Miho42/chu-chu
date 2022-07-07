@@ -370,15 +370,20 @@ class TileMatrix:
 
         # Create list for Emitters
         self.emitters = arcade.SpriteList()
-        # Find tile to stand on
-        emitter_dest_tile = self.matrix[level_data["emitter"]["pos"]]
-        # Create emitter and tell it where to stand
-        emitter = Emitter(emitter_dest_tile, type=level_data["emitter"]["image"])
-        self.add_emitter(emitter)
+
+        # Add an emitter
+        self.add_emitter(
+            Emitter(
+                self.get_tile(level_data["emitter"]["pos"]),
+                type=level_data["emitter"]["image"],
+            )
+        )
 
         # Create list for drains
         self.drains = arcade.SpriteList()
-        self.add_drain(Drain(self.matrix[level_data["drain"]["pos"]]))
+
+        # Add a drain
+        self.add_drain(Drain(self.get_tile(level_data["drain"]["pos"])))
 
         # Create list for annotations
         self.annotations = arcade.SpriteList()
@@ -394,6 +399,14 @@ class TileMatrix:
             return True
         else:
             return False
+
+    def get_tile(self, position):
+        """
+        Return tile object on <position> in matrix
+        """
+        return self.matrix[
+            position[1] * self.matrix_width + position[0] % self.matrix_width
+        ]
 
     def move_player(self, player_no: int, dir: list):
         """
@@ -549,8 +562,8 @@ class MyGame(arcade.Window):
                 [4, 0, 0, 0, 0, 2],
                 [8, 3, 3, 3, 3, 7],
             ],
-            "emitter": {"pos": (8), "image": 0},
-            "drain": {"pos": (5)},
+            "emitter": {"pos": (1, 1), "image": 0},
+            "drain": {"pos": (2, 0)},
         },
         2: {
             "tiles": [
@@ -560,8 +573,8 @@ class MyGame(arcade.Window):
                 [4, 0, 0, 0, 2],
                 [8, 3, 3, 3, 7],
             ],
-            "emitter": {"pos": (23), "image": 0},
-            "drain": {"pos": (2)},
+            "emitter": {"pos": (3, 4), "image": 0},
+            "drain": {"pos": (2, 1)},
         },
     }
 
