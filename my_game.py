@@ -239,7 +239,13 @@ class Emitter(arcade.Sprite):
     emitter_types = {0: "images/Emitter/Emitter_jar.png"}
 
     def __init__(
-        self, on_tile, type=0, capacity=5, emit_vector=(-1, 0), emit_rate=2.0, **kwargs
+        self,
+        on_tile,
+        emit_direction,
+        type,
+        capacity=5,
+        emit_rate=2.0,
+        **kwargs,
     ):
         """
         Setup new Emitter
@@ -262,7 +268,7 @@ class Emitter(arcade.Sprite):
         self.go_to_tile(on_tile)
 
         # Direction for the outspitted Chuchus
-        self.emit_vector = emit_vector
+        self.emit_vector = emit_direction
 
         # Create queue for waiting Chuchus
         self.chuchus_queue = arcade.SpriteList()
@@ -371,6 +377,7 @@ class TileMatrix:
                 Emitter(
                     self.get_tile(e["pos"]),
                     type=e["image"],
+                    emit_direction=e["emit_direction"],
                 )
             )
 
@@ -552,7 +559,10 @@ class MyGame(arcade.Window):
                 [4, 0, 0, 0, 0, 2],
                 [8, 3, 3, 3, 3, 7],
             ],
-            "emitters": [{"pos": (1, 1), "image": 0}, {"pos": (2, 3), "image": 0}],
+            "emitters": [
+                {"pos": (1, 1), "emit_direction": (-1, 0), "image": 0},
+                {"pos": (2, 3), "emit_direction": (0, 1), "image": 0},
+            ],
             "drains": [{"pos": (2, 0)}],
         },
         2: {
@@ -563,7 +573,7 @@ class MyGame(arcade.Window):
                 [4, 0, 0, 0, 2],
                 [8, 3, 3, 3, 7],
             ],
-            "emitters": [{"pos": (3, 4), "image": 0}],
+            "emitters": [{"pos": (3, 4), "emit_direction": (-1, 0), "image": 0}],
             "drains": [{"pos": (2, 1)}],
         },
     }
