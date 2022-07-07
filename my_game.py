@@ -343,7 +343,7 @@ class TileMatrix:
         matrix_offset_y=100,
     ):
         # Ceate sprite lists
-        self.matrix = arcade.SpriteList()
+        self.tiles = arcade.SpriteList()
         self.chuchus = arcade.SpriteList()
         self.emitters = arcade.SpriteList()
         self.drains = arcade.SpriteList()
@@ -355,11 +355,11 @@ class TileMatrix:
         self.matrix_offset_x = matrix_offset_x
         self.matrix_offset_y = matrix_offset_y
 
-        # Append tile objects with correct screen positions to matrix
+        # Add Tile objects with correct screen positions
         new_tile_x = matrix_offset_x
         new_tile_y = matrix_offset_y + (self.matrix_height - 1) * tile_size
         for row in level_data["tiles"]:
-            self.matrix.extend(
+            self.tiles.extend(
                 [
                     Tile(
                         type=type,
@@ -401,7 +401,7 @@ class TileMatrix:
         """
         Return tile object on <position> in matrix
         """
-        return self.matrix[
+        return self.tiles[
             position[1] * self.matrix_width + position[0] % self.matrix_width
         ]
 
@@ -460,7 +460,7 @@ class TileMatrix:
         return None
 
     def draw(self):
-        self.matrix.draw()
+        self.tiles.draw()
         self.annotations.draw()
         self.emitters.draw()
         self.drains.draw()
@@ -496,7 +496,7 @@ class TileMatrix:
 
                 # Look at tiles
                 current_tile = self.get_sprite_from_screen_coordinates(
-                    c.position, self.matrix
+                    c.position, self.tiles
                 )
                 assert current_tile is not None, "Chuchu was not on any tile"
                 # Assume Chuchu is moving on
