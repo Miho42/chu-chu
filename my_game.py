@@ -336,8 +336,13 @@ class TileMatrix:
         matrix_offset_x=100,
         matrix_offset_y=100,
     ):
-        # Create matrix
+        # Ceate sprite lists
         self.matrix = arcade.SpriteList()
+        self.chuchus = arcade.SpriteList()
+        self.emitters = arcade.SpriteList()
+        self.drains = arcade.SpriteList()
+        self.annotations = arcade.SpriteList()
+        self.players = arcade.SpriteList()
 
         self.matrix_width = len(level_data["tiles"][0])
         self.matrix_height = len(level_data["tiles"])
@@ -360,33 +365,18 @@ class TileMatrix:
             )
             new_tile_y -= tile_size
 
-        # Create list for chuchus
-        self.chuchus = arcade.SpriteList()
-
-        # Create list for Players
-        self.players = arcade.SpriteList()
-        # Append player to playerlist with start position
-        self.players.append(Player(tile_pos=(1, 1)))
-
-        # Create list for Emitters
-        self.emitters = arcade.SpriteList()
-
-        # Add an emitter
-        self.add_emitter(
-            Emitter(
-                self.get_tile(level_data["emitter"]["pos"]),
-                type=level_data["emitter"]["image"],
+        # Add emitters
+        for e in level_data["emitters"]:
+            self.add_emitter(
+                Emitter(
+                    self.get_tile(e["pos"]),
+                    type=e["image"],
+                )
             )
-        )
 
-        # Create list for drains
-        self.drains = arcade.SpriteList()
-
-        # Add a drain
-        self.add_drain(Drain(self.get_tile(level_data["drain"]["pos"])))
-
-        # Create list for annotations
-        self.annotations = arcade.SpriteList()
+        # Add drains
+        for d in level_data["drains"]:
+            self.add_drain(Drain(self.get_tile(d["pos"])))
 
     @property
     def level_clear(self):
@@ -562,8 +552,8 @@ class MyGame(arcade.Window):
                 [4, 0, 0, 0, 0, 2],
                 [8, 3, 3, 3, 3, 7],
             ],
-            "emitter": {"pos": (1, 1), "image": 0},
-            "drain": {"pos": (2, 0)},
+            "emitters": [{"pos": (1, 1), "image": 0}, {"pos": (2, 3), "image": 0}],
+            "drains": [{"pos": (2, 0)}],
         },
         2: {
             "tiles": [
@@ -573,8 +563,8 @@ class MyGame(arcade.Window):
                 [4, 0, 0, 0, 2],
                 [8, 3, 3, 3, 7],
             ],
-            "emitter": {"pos": (3, 4), "image": 0},
-            "drain": {"pos": (2, 1)},
+            "emitters": [{"pos": (3, 4), "image": 0}],
+            "drains": [{"pos": (2, 1)}],
         },
     }
 
