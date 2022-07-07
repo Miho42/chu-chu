@@ -88,15 +88,31 @@ class Tile(arcade.Sprite):
     """
 
     types = {
-        0: {"out_dir": (0, 0), "image": "wall_none.png"},
-        1: {"out_dir": (1, 0), "image": "wall_top.png"},
-        2: {"out_dir": (0, -1), "image": "wall_right.png"},
-        3: {"out_dir": (-1, 0), "image": "wall_bottom.png"},
-        4: {"out_dir": (0, 1), "image": "wall_left.png"},
-        5: {"out_dir": (1, 0), "image": "wall_top_left.png"},
-        6: {"out_dir": (0, -1), "image": "wall_top_right.png"},
-        7: {"out_dir": (-1, 0), "image": "wall_bottom_right.png"},
-        8: {"out_dir": (0, 1), "image": "wall_bottom_left.png"},
+        0: {"out_dir": (0, 0), "block_dirs": [], "image": "wall_none.png"},
+        1: {"out_dir": (1, 0), "block_dirs": [(0, 1)], "image": "wall_top.png"},
+        2: {"out_dir": (0, -1), "block_dirs": [(1, 0)], "image": "wall_right.png"},
+        3: {"out_dir": (-1, 0), "block_dirs": [(0, -1)], "image": "wall_bottom.png"},
+        4: {"out_dir": (0, 1), "block_dirs": [(-1, 0)], "image": "wall_left.png"},
+        5: {
+            "out_dir": (1, 0),
+            "block_dirs": [(0, 1), (-1, 0)],
+            "image": "wall_top_left.png",
+        },
+        6: {
+            "out_dir": (0, -1),
+            "block_dirs": [(0, 1), (1, 0)],
+            "image": "wall_top_right.png",
+        },
+        7: {
+            "out_dir": (-1, 0),
+            "block_dirs": [(1, 0), (0, -1)],
+            "image": "wall_bottom_right.png",
+        },
+        8: {
+            "out_dir": (0, 1),
+            "block_dirs": [(-1, 0), (0, -1)],
+            "image": "wall_bottom_left.png",
+        },
     }
 
     def __init__(self, type=0, **kwargs):
@@ -361,7 +377,7 @@ class TileMatrix:
         else:
             return False
 
-    def move_player(self, player_no:int, dir: list):
+    def move_player(self, player_no: int, dir: list):
         """
         The player is moved
         """
@@ -384,7 +400,6 @@ class TileMatrix:
         # Update player position on screen
         p.center_x = p.tile_pos[0] * TILE_SIZE + self.matrix_offset_x
         p.center_y = p.tile_pos[1] * TILE_SIZE + self.matrix_offset_y
-
 
     def add_annotation(self, player_no, annotation: Annotation):
         annotation.position = self.players[player_no].position
@@ -451,24 +466,25 @@ class TileMatrix:
                     # Nothing more to do for this Chuchu
                     break
 
-                # FIXME
-                # Out_dir dur jo ikke hvis man kommer fra den forkerte side.
-                # Eks:
-                # Vi har en tile i toppen med en væg kun på toppen.
-                # Der kommer en Chuchu fra højre.
-                # Tilens out_dir er til højre, så Chuchu drejer til højre selvom den kommer fra højre, uden at støde ind i væg (den går baglæns)
-
                 # Look at tiles
                 current_tile = self.get_sprite_from_screen_coordinates(
                     c.position, self.matrix
                 )
                 assert current_tile is not None, "Chuchu was not on any tile"
-                c.move(current_tile.my_type["out_dir"])
+                # Assume Chuchu is moving on
+                new_direction = c.my_direction
+
+                # If Chuchus current direction is blocked by the tile the direction is changed to the tile's out direction
+                if c.my_direction in current_tile.my_type["block_dirs"]:
+                    new_direction = current_tile.my_type["out_dir"]
+
+                c.move(new_direction)
 
             c.update(delta_time)
 
         for p in self.players:
             p.update(delta_time)
+
 
 class PlayerShot(arcade.Sprite):
     """
@@ -513,7 +529,7 @@ class MyGame(arcade.Window):
             + [4, 0, 0, 0, 2]
             + [4, 0, 0, 0, 2]
             + [5, 1, 1, 1, 6],
-            "emitter": {"pos": (4), "image": 0},
+            "emitter": {"pos": (24), "image": 0},
             "drain": {"pos": (5)},
         },
         2: {
