@@ -280,7 +280,7 @@ class Emitter(arcade.Sprite):
         if any(self.chuchus_queue) and self.emit_timer <= 0:
             self.emit_timer = self.emit_rate
             c = self.chuchus_queue.pop()
-            print(f"Nunber of Chuchus emitted: {self.no_emitted}")
+            print(f"Number of Chuchus emitted: {self.no_emitted}")
             return c
 
     def update(self, delta_time):
@@ -344,9 +344,15 @@ class TileMatrix:
         self.matrix_offset_x = matrix_offset_x
         self.matrix_offset_y = matrix_offset_y
 
+        # Matrix is drawn bottom-up, but level is designed top-down
+        # It has to be reversed before rendering
+        reversed_tiles = []
+        for row in reversed(level_data["tiles"]):
+            reversed_tiles.extend(row)
+
         # Append tiles to matrix
         for i in range(matrix_width * matrix_height):
-            t = Tile(type=level_data["tiles"][i])
+            t = Tile(type=reversed_tiles[i])
             t.center_x = ((i % matrix_width) * tile_size) + matrix_offset_x
             t.center_y = ((i // matrix_height) * tile_size) + matrix_offset_y
             self.matrix.append(t)
@@ -533,20 +539,24 @@ class MyGame(arcade.Window):
     # Drawn upside down
     levels = {
         1: {
-            "tiles": [8, 3, 3, 3, 7]
-            + [4, 0, 0, 0, 2]
-            + [4, 0, 0, 0, 2]
-            + [4, 0, 0, 0, 2]
-            + [5, 1, 1, 1, 6],
+            "tiles": [
+                [5, 1, 1, 1, 6],
+                [4, 0, 0, 0, 2],
+                [4, 0, 0, 0, 2],
+                [4, 0, 0, 0, 2],
+                [8, 3, 3, 3, 7],
+            ],
             "emitter": {"pos": (24), "image": 0},
             "drain": {"pos": (5)},
         },
         2: {
-            "tiles": [8, 3, 3, 3, 7]
-            + [4, 0, 0, 0, 2]
-            + [4, 0, 2, 4, 2]
-            + [4, 0, 2, 4, 2]
-            + [5, 1, 6, 5, 6],
+            "tiles": [
+                [5, 1, 6, 5, 6],
+                [4, 0, 2, 4, 2],
+                [4, 0, 2, 4, 2],
+                [4, 0, 0, 0, 2],
+                [8, 3, 3, 3, 7],
+            ],
             "emitter": {"pos": (1), "image": 0},
             "drain": {"pos": (2)},
         },
