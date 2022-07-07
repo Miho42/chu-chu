@@ -330,8 +330,6 @@ class TileMatrix:
     def __init__(
         self,
         level_data,
-        matrix_width=5,
-        matrix_height=5,
         tile_size=TILE_SIZE,
         matrix_offset_x=200,
         matrix_offset_y=200,
@@ -339,8 +337,8 @@ class TileMatrix:
         # Create matrix
         self.matrix = arcade.SpriteList()
 
-        self.matrix_width = matrix_width
-        self.matrix_height = matrix_height
+        matrix_width = len(level_data["tiles"][0])
+        matrix_height = len(level_data["tiles"])
         self.matrix_offset_x = matrix_offset_x
         self.matrix_offset_y = matrix_offset_y
 
@@ -348,6 +346,9 @@ class TileMatrix:
         # It has to be reversed before rendering
         reversed_tiles = []
         for row in reversed(level_data["tiles"]):
+            assert (
+                len(row) == matrix_width
+            ), f"Length of rown in level mismatch: {len(row)} != {matrix_width}"
             reversed_tiles.extend(row)
 
         # Append tiles to matrix
@@ -540,13 +541,14 @@ class MyGame(arcade.Window):
     levels = {
         1: {
             "tiles": [
-                [5, 1, 1, 1, 6],
-                [4, 0, 0, 0, 2],
-                [4, 0, 0, 0, 2],
-                [4, 0, 0, 0, 2],
-                [8, 3, 3, 3, 7],
+                [5, 1, 1, 1, 1, 6],
+                [4, 0, 0, 0, 0, 2],
+                [4, 0, 0, 0, 0, 2],
+                [4, 0, 0, 0, 0, 2],
+                [4, 0, 0, 0, 0, 2],
+                [8, 3, 3, 3, 3, 7],
             ],
-            "emitter": {"pos": (24), "image": 0},
+            "emitter": {"pos": (2), "image": 0},
             "drain": {"pos": (5)},
         },
         2: {
