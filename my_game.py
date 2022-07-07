@@ -115,7 +115,7 @@ class Tile(arcade.Sprite):
         },
     }
 
-    def __init__(self, type=0, **kwargs):
+    def __init__(self, type=0, center_x=0, center_y=0, **kwargs):
         """
         Setup new Tile object
         """
@@ -129,6 +129,8 @@ class Tile(arcade.Sprite):
 
         # Pass arguments to class arcade.Sprite
         super().__init__(**kwargs)
+
+        self.position = center_x, center_y
 
 
 class Chuchu(arcade.Sprite):
@@ -331,32 +333,32 @@ class TileMatrix:
         self,
         level_data,
         tile_size=TILE_SIZE,
-        matrix_offset_x=200,
-        matrix_offset_y=200,
+        matrix_offset_x=100,
+        matrix_offset_y=100,
     ):
         # Create matrix
         self.matrix = arcade.SpriteList()
 
-        matrix_width = len(level_data["tiles"][0])
-        matrix_height = len(level_data["tiles"])
+        self.matrix_width = len(level_data["tiles"][0])
+        self.matrix_height = len(level_data["tiles"])
         self.matrix_offset_x = matrix_offset_x
         self.matrix_offset_y = matrix_offset_y
 
-        # Matrix is drawn bottom-up, but level is designed top-down
-        # It has to be reversed before rendering
-        reversed_tiles = []
-        for row in reversed(level_data["tiles"]):
-            assert (
-                len(row) == matrix_width
-            ), f"Length of rown in level mismatch: {len(row)} != {matrix_width}"
-            reversed_tiles.extend(row)
-
-        # Append tiles to matrix
-        for i in range(matrix_width * matrix_height):
-            t = Tile(type=reversed_tiles[i])
-            t.center_x = ((i % matrix_width) * tile_size) + matrix_offset_x
-            t.center_y = ((i // matrix_height) * tile_size) + matrix_offset_y
-            self.matrix.append(t)
+        # Append tile objects with correct screen positions to matrix
+        new_tile_x = matrix_offset_x
+        new_tile_y = matrix_offset_y + (self.matrix_height - 1) * tile_size
+        for row in level_data["tiles"]:
+            self.matrix.extend(
+                [
+                    Tile(
+                        type=type,
+                        center_x=index * tile_size + new_tile_x,
+                        center_y=new_tile_y,
+                    )
+                    for index, type in enumerate(row)
+                ]
+            )
+            new_tile_y -= tile_size
 
         # Create list for chuchus
         self.chuchus = arcade.SpriteList()
@@ -545,10 +547,9 @@ class MyGame(arcade.Window):
                 [4, 0, 0, 0, 0, 2],
                 [4, 0, 0, 0, 0, 2],
                 [4, 0, 0, 0, 0, 2],
-                [4, 0, 0, 0, 0, 2],
                 [8, 3, 3, 3, 3, 7],
             ],
-            "emitter": {"pos": (2), "image": 0},
+            "emitter": {"pos": (8), "image": 0},
             "drain": {"pos": (5)},
         },
         2: {
@@ -559,7 +560,7 @@ class MyGame(arcade.Window):
                 [4, 0, 0, 0, 2],
                 [8, 3, 3, 3, 7],
             ],
-            "emitter": {"pos": (1), "image": 0},
+            "emitter": {"pos": (23), "image": 0},
             "drain": {"pos": (2)},
         },
     }
