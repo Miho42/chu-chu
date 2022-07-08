@@ -36,11 +36,11 @@ class Player(arcade.Sprite):
     The player
     """
 
-    def __init__(self, tile_pos, **kwargs):
+    def __init__(self, **kwargs):
         """
         Setup new Player object
         """
-        self._tile_pos = tile_pos
+        self._tile_pos = (0, 0)
 
         # Graphics to use for Player
         kwargs["filename"] = "images/playerShip1_red.png"
@@ -405,7 +405,7 @@ class TileMatrix:
             position[1] * self.matrix_width + position[0] % self.matrix_width
         ]
 
-    def move_player(self, player_no: int, dir: list):
+    def move_player(self, player_no: int, direction: list) -> None:
         """
         The player is moved
         """
@@ -413,21 +413,27 @@ class TileMatrix:
         # Current grid position
         current_pos = p.tile_pos
         # New position in grid
-        new_pos = (current_pos[0] + dir[0], current_pos[1] + dir[1])
+        new_pos = (current_pos[0] + direction[0], current_pos[1] + direction[1])
 
-        # Check if new position is legal
+        # Return if new position is illegal
         if not -1 < new_pos[0] < self.matrix_width:
             return None
         if not -1 < new_pos[1] < self.matrix_height:
             return None
 
         # Update player position in grid
-        self.players[player_no].tile_pos = new_pos
+        p.tile_pos = new_pos
+        # Update player's screen coordinates to
+        # match tile on new position
+        p.position = self.get_tile(new_pos).position
 
-        # FIXME this should be handled in the player
-        # Update player position on screen
-        p.center_x = p.tile_pos[0] * TILE_SIZE + self.matrix_offset_x
-        p.center_y = p.tile_pos[1] * TILE_SIZE + self.matrix_offset_y
+    def add_player(self, player, tile_pos) -> Player:
+        """
+        Add a player to the game
+        """
+        player.tile_pos = tile_pos
+        player.position = self.get_tile(tile_pos).position
+        self.players.append(player)
 
     def add_annotation(self, player_no, annotation: Annotation):
         annotation.position = self.players[player_no].position
@@ -514,36 +520,6 @@ class TileMatrix:
             p.update(delta_time)
 
 
-class PlayerShot(arcade.Sprite):
-    """
-    A shot fired by the Player
-    """
-
-    def __init__(self, center_x=0, center_y=0):
-        """
-        Setup new PlayerShot object
-        """
-
-        # Set the graphics to use for the sprite
-        super().__init__("images/Lasers/laserBlue01.png", SPRITE_SCALING)
-
-        self.center_x = center_x
-        self.center_y = center_y
-        self.change_y = PLAYER_SHOT_SPEED
-
-    def update(self, delta_time):
-        """
-        Move the sprite
-        """
-
-        # Update y position
-        self.center_y += self.change_y
-
-        # Remove shot when over top of screen
-        if self.bottom > SCREEN_HEIGHT:
-            self.kill()
-
-
 class MyGame(arcade.Window):
     """
     Main application class.
@@ -585,9 +561,6 @@ class MyGame(arcade.Window):
 
         # Call the parent class initializer
         super().__init__(width, height)
-
-        # Variable that will hold a list of shots fired by the player
-        self.player_shot_list = None
 
         # Set up the player info
         self.player_sprite = None
@@ -641,9 +614,6 @@ class MyGame(arcade.Window):
         # No of lives
         self.player_lives = PLAYER_LIVES
 
-        # Sprite lists
-        self.player_shot_list = arcade.SpriteList()
-
         # Start at level 1
         self.level = 1
 
@@ -655,6 +625,8 @@ class MyGame(arcade.Window):
             self.level in MyGame.levels.keys()
         ), f"Error: no data for level {self.level}"
         self.tile_matrix = TileMatrix(level_data=MyGame.levels[self.level])
+        # Add a player to the game
+        self.tile_matrix.add_player(Player(), (1, 1))
 
     def end_level(self):
         self.level += 1
@@ -667,9 +639,6 @@ class MyGame(arcade.Window):
 
         # This command has to happen before we start drawing
         arcade.start_render()
-
-        # Draw the player shot
-        self.player_shot_list.draw()
 
         # Draw players score on screen
         arcade.draw_text(
@@ -701,12 +670,14 @@ class MyGame(arcade.Window):
         """
 
         # Track state of arrow keys
+        # These directions are in level coordinates,
+        # that is y is opposite of screen coordinatesystem.
         if key == arcade.key.UP:
             self.up_pressed = True
-            self.tile_matrix.move_player(0, (0, 1))
+            self.tile_matrix.move_player(0, (0, -1))
         elif key == arcade.key.DOWN:
             self.down_pressed = True
-            self.tile_matrix.move_player(0, (0, -1))
+            self.tile_matrix.move_player(0, (0, 1))
         elif key == arcade.key.LEFT:
             self.left_pressed = True
             self.tile_matrix.move_player(0, (-1, 0))
@@ -715,12 +686,7 @@ class MyGame(arcade.Window):
             self.tile_matrix.move_player(0, (1, 0))
 
         if key == FIRE_KEY:
-            # new_shot = PlayerShot(
-            #    self.player_sprite.center_x, self.player_sprite.center_y
-            # )
             self.tile_matrix.add_annotation(0, Annotation())
-
-            # self.player_shot_list.append(new_shot)
 
     def on_key_release(self, key, modifiers):
         """
