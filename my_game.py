@@ -427,15 +427,19 @@ class TileMatrix:
         # match tile on new position
         p.position = self.get_tile(new_pos).position
 
-    def add_player(self, player, tile_pos) -> Player:
+    def add_player(self, player: Player, tile_pos) -> int:
         """
         Add a player to the game
         """
         player.tile_pos = tile_pos
         player.position = self.get_tile(tile_pos).position
         self.players.append(player)
+        return self.players.index(player)
 
     def add_annotation(self, player_no, annotation: Annotation):
+        """
+        Add an annotation at the position of the player
+        """
         annotation.position = self.players[player_no].position
         self.annotations.append(annotation)
 
@@ -566,6 +570,7 @@ class MyGame(arcade.Window):
         self.player_sprite = None
         self.player_score = None
         self.player_lives = None
+        self.players = None
 
         # Set up matrix
         self.tile_matrix = None
@@ -617,6 +622,8 @@ class MyGame(arcade.Window):
         # Start at level 1
         self.level = 1
 
+        self.players = arcade.SpriteList()
+        self.players.append(Player())
         self.start_level()
 
     def start_level(self):
@@ -626,7 +633,9 @@ class MyGame(arcade.Window):
         ), f"Error: no data for level {self.level}"
         self.tile_matrix = TileMatrix(level_data=MyGame.levels[self.level])
         # Add a player to the game
-        self.tile_matrix.add_player(Player(), (1, 1))
+        for p in self.players:
+            p_no = self.tile_matrix.add_player(p, (1, 1))
+            print(f"Added player as no. {p_no}")
 
     def end_level(self):
         self.level += 1
