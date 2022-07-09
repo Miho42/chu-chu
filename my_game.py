@@ -9,6 +9,8 @@ Artwork from https://kenney.nl/assets/space-shooter-redux
 from enum import Enum
 import arcade
 
+# Print debug information
+DEBUG_ON = not True
 
 SPRITE_SCALING = 4
 TILE_SCALING = 4
@@ -212,8 +214,8 @@ class Chuchu(arcade.Sprite):
         """
         When a Chuchu reaches a drain and should no longer exist
         """
-
-        print("I was drained. Yes!")
+        if DEBUG_ON:
+            print("I was drained. Yes!")
         self.kill()
 
     def move(self, new_direction):
@@ -327,7 +329,8 @@ class Emitter(arcade.Sprite):
         if any(self.chuchus_queue) and self.emit_timer <= 0:
             self.emit_timer = self.emit_rate
             c = self.chuchus_queue.pop()
-            print(f"Number of Chuchus emitted: {self.no_emitted}")
+            if DEBUG_ON:
+                print(f"Number of Chuchus emitted: {self.no_emitted}")
             return c
 
     def update(self, delta_time):
@@ -358,7 +361,8 @@ class Drain(arcade.Sprite):
         <chuchu> has been drained by me
         """
         self.no_drained += 1
-        print(f"I have drained a total number of {self.no_drained} chuchus :D")
+        if DEBUG_ON:
+            print(f"I have drained a total number of {self.no_drained} chuchus :D")
 
 
 class Annotation(arcade.Sprite):
@@ -689,7 +693,8 @@ class MyGame(arcade.Window):
         # Add a player to the game
         for p in self.players:
             p_no = self.tile_matrix.add_player(p, (1, 1))
-            print(f"Added player as no. {p_no}")
+            if DEBUG_ON:
+                print(f"Added player as no. {p_no}")
 
     def end_level(self):
         self.level += 1
