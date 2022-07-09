@@ -10,7 +10,7 @@ from enum import Enum
 import arcade
 
 
-SPRITE_SCALING = 0.5
+SPRITE_SCALING = 4
 TILE_SCALING = 4
 TILE_SIZE = TILE_SCALING * 16
 
@@ -29,6 +29,43 @@ PLAYER_START_Y = 50
 PLAYER_SHOT_SPEED = 4
 
 FIRE_KEY = arcade.key.SPACE
+
+TEXTURES = arcade.load_spritesheet(
+    file_name="images/urbanrpg/tilemap.png",
+    sprite_width=16,
+    sprite_height=16,
+    columns=27,
+    count=18 * 27,
+    margin=1,
+)
+
+# Indexes for tiles
+T_TILE_TL = 0
+T_TILE_T = 1
+T_TILE_TR = 2
+T_TILE_L = 1 * 27
+T_TILE_NONE = 1 * 27 + 1
+T_TILE_R = 1 * 27 + 2
+T_TILE_BR = 2 * 27 + 2
+T_TILE_BL = 2 * 27
+T_TILE_B = 2 * 27 + 1
+
+# Indexes for chuchus
+C1_UP1 = 25
+C1_UP2 = C1_UP1 + 27
+C1_UP3 = C1_UP2 + 27
+
+# Emitters
+E_E1 = 11 * 27 + 9
+
+# Drains
+D_D1 = 11 * 27 + 13
+
+# Annotations
+A_UP1 = 7 * 27 + 1
+
+# Players
+P_P1 = 9 * 27 + 2
 
 
 class Player(arcade.Sprite):
@@ -51,6 +88,8 @@ class Player(arcade.Sprite):
         # Pass arguments to class arcade.Sprite
         super().__init__(**kwargs)
 
+        self.texture = TEXTURES[P_P1]
+
     @property
     def tile_pos(self):
         return self._tile_pos
@@ -71,16 +110,6 @@ class TileType(Enum):
     Tiles with wall. Prefix T mean tile. next character is wall on x-axis, last character is wall on y-axis.
     """
 
-    T__ = 0
-    T_T = 1
-    TR_ = 2
-    T_B = 3
-    TL_ = 4
-    TLT = 5
-    TRT = 6
-    TRB = 7
-    TLB = 8
-
 
 class Tile(arcade.Sprite):
     """
@@ -88,30 +117,38 @@ class Tile(arcade.Sprite):
     """
 
     types = {
-        0: {"out_dir": (0, 0), "block_dirs": [], "image": "wall_none.png"},
-        1: {"out_dir": (1, 0), "block_dirs": [(0, 1)], "image": "wall_top.png"},
-        2: {"out_dir": (0, -1), "block_dirs": [(1, 0)], "image": "wall_right.png"},
-        3: {"out_dir": (-1, 0), "block_dirs": [(0, -1)], "image": "wall_bottom.png"},
-        4: {"out_dir": (0, 1), "block_dirs": [(-1, 0)], "image": "wall_left.png"},
+        0: {"out_dir": (0, 0), "block_dirs": [], "texture_no": T_TILE_NONE},
+        1: {"out_dir": (1, 0), "block_dirs": [(0, 1)], "texture_no": T_TILE_T},
+        2: {"out_dir": (0, -1), "block_dirs": [(1, 0)], "texture_no": T_TILE_R},
+        3: {
+            "out_dir": (-1, 0),
+            "block_dirs": [(0, -1)],
+            "texture_no": T_TILE_B,
+        },
+        4: {
+            "out_dir": (0, 1),
+            "block_dirs": [(-1, 0)],
+            "texture_no": T_TILE_L,
+        },
         5: {
             "out_dir": (1, 0),
             "block_dirs": [(0, 1), (-1, 0)],
-            "image": "wall_top_left.png",
+            "texture_no": T_TILE_TL,
         },
         6: {
             "out_dir": (0, -1),
             "block_dirs": [(0, 1), (1, 0)],
-            "image": "wall_top_right.png",
+            "texture_no": T_TILE_TR,
         },
         7: {
             "out_dir": (-1, 0),
             "block_dirs": [(1, 0), (0, -1)],
-            "image": "wall_bottom_right.png",
+            "texture_no": T_TILE_BR,
         },
         8: {
             "out_dir": (0, 1),
             "block_dirs": [(-1, 0), (0, -1)],
-            "image": "wall_bottom_left.png",
+            "texture_no": T_TILE_BL,
         },
     }
 
@@ -121,14 +158,13 @@ class Tile(arcade.Sprite):
         """
         self.my_type = Tile.types[type]
 
-        # Graphics to use for Tile
-        kwargs["filename"] = f'images/Tiles/{self.my_type["image"]}'
-
         # How much to scale the graphics
         kwargs["scale"] = TILE_SCALING
 
         # Pass arguments to class arcade.Sprite
         super().__init__(**kwargs)
+
+        self.texture = TEXTURES[self.my_type["texture_no"]]
 
         self.position = center_x, center_y
 
@@ -150,14 +186,14 @@ class Chuchu(arcade.Sprite):
         # Steps per tile
         self.my_speed = my_speed
 
-        # Graphics
-        kwargs["filename"] = "images/Chuchu/Chuchu.png"
-
         # Scale the graphics
         kwargs["scale"] = TILE_SCALING
 
         # Pass arguments to class arcade.Sprite
         super().__init__(**kwargs)
+
+        # Graphics
+        self.texture = TEXTURES[C1_UP2]
 
         # The screen coordinates I'm moving towards
         self.my_destination_screen_coordinates = (self.center_x, self.center_y)
@@ -259,11 +295,14 @@ class Emitter(arcade.Sprite):
 
         self.capacity = capacity
 
-        kwargs["filename"] = Emitter.emitter_types[type]
         kwargs["scale"] = TILE_SCALING
 
         # Pass arguments to class arcade.Sprite
         super().__init__(**kwargs)
+
+        # kwargs["filename"] = Emitter.emitter_types[type]
+
+        self.texture = TEXTURES[E_E1]
 
         self.go_to_tile(on_tile)
 
@@ -302,12 +341,13 @@ class Drain(arcade.Sprite):
     """
 
     def __init__(self, on_tile, **kwargs):
-        kwargs["filename"] = "images/Drain/Drain_cream.png"
+
         kwargs["scale"] = TILE_SCALING
 
         # Pass arguments to class arcade.Sprite
         super().__init__(**kwargs)
 
+        self.texture = TEXTURES[D_D1]
         self.position = on_tile.position
 
         # Number of Chuchus drained
@@ -323,10 +363,12 @@ class Drain(arcade.Sprite):
 
 class Annotation(arcade.Sprite):
     def __init__(self, **kwargs):
-        kwargs["filename"] = "images/Annotations/Annotation_2.png"
+        # kwargs["filename"] = "images/Annotations/Annotation_2.png"
         kwargs["scale"] = TILE_SCALING
         # Pass arguments to class arcade.Sprite
         super().__init__(**kwargs)
+
+        self.texture = TEXTURES[A_UP1]
 
 
 class TileMatrix:
@@ -334,6 +376,16 @@ class TileMatrix:
     Matrix of Tile(s) >:)
     Consists of chuchus
     """
+
+    # Load textures
+    textures = arcade.load_spritesheet(
+        file_name="images/urbanrpg/tilemap.png",
+        sprite_width=16,
+        sprite_height=16,
+        columns=27,
+        count=18 * 27,
+        margin=1,
+    )
 
     def __init__(
         self,
@@ -370,6 +422,8 @@ class TileMatrix:
                 ]
             )
             new_tile_y -= tile_size
+
+        # self.tiles[0].texture = TileMatrix.textures[0]
 
         # Add emitters
         for e in level_data["emitters"]:
@@ -469,13 +523,13 @@ class TileMatrix:
                 return t
         return None
 
-    def draw(self):
-        self.tiles.draw()
-        self.annotations.draw()
-        self.emitters.draw()
-        self.drains.draw()
-        self.chuchus.draw()
-        self.players.draw()
+    def draw(self, pixelated=True):
+        self.tiles.draw(pixelated=pixelated)
+        self.annotations.draw(pixelated=pixelated)
+        self.emitters.draw(pixelated=pixelated)
+        self.drains.draw(pixelated=pixelated)
+        self.chuchus.draw(pixelated=pixelated)
+        self.players.draw(pixelated=pixelated)
 
     def update(self, delta_time):
 
@@ -540,7 +594,7 @@ class MyGame(arcade.Window):
                 [8, 3, 3, 3, 3, 7],
             ],
             "emitters": [
-                {"pos": (1, 1), "emit_direction": (-1, 0), "image": 0},
+                {"pos": (4, 1), "emit_direction": (-1, 0), "image": 0},
                 {"pos": (2, 3), "emit_direction": (0, 1), "image": 0},
             ],
             "drains": [{"pos": (2, 0)}],
