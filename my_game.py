@@ -7,6 +7,7 @@ Artwork from https://kenney.nl/assets/space-shooter-redux
 
 """
 from enum import Enum
+from typing import List, Optional, Union
 import arcade
 
 # Print debug information
@@ -70,6 +71,29 @@ A_UP1 = 7 * 27 + 1
 P_P1 = 9 * 27 + 2
 
 
+class Direction(Enum):
+    """
+    Directions in the game matrix.
+    """
+    UP = (0, 1)
+    DOWN = (0, -1)
+    LEFT = (-1, 0)
+    RIGHT = (1, 0)
+    NONE = (0, 0)
+
+    def __bool__(self) -> bool:
+        """
+        The None direction is False
+        """
+        return self.value != (0, 0)
+
+    def __mul__(self, other: Union[float, int]) -> List[Union[float, int]]:
+        """
+        Multiply all values in Direction
+        """
+        return [other * v for v in self.value]
+
+
 class Player(arcade.Sprite):
     """
     The player
@@ -119,37 +143,45 @@ class Tile(arcade.Sprite):
     """
 
     types = {
-        0: {"out_dir": (0, 0), "block_dirs": [], "texture_no": T_TILE_NONE},
-        1: {"out_dir": (1, 0), "block_dirs": [(0, 1)], "texture_no": T_TILE_T},
-        2: {"out_dir": (0, -1), "block_dirs": [(1, 0)], "texture_no": T_TILE_R},
+        0: {"out_dir": Direction.NONE, "block_dirs": [], "texture_no": T_TILE_NONE},
+        1: {
+            "out_dir": Direction.RIGHT,
+            "block_dirs": [Direction.UP],
+            "texture_no": T_TILE_T,
+        },
+        2: {
+            "out_dir": Direction.DOWN,
+            "block_dirs": [Direction.RIGHT],
+            "texture_no": T_TILE_R,
+        },
         3: {
-            "out_dir": (-1, 0),
-            "block_dirs": [(0, -1)],
+            "out_dir": Direction.LEFT,
+            "block_dirs": [Direction.DOWN],
             "texture_no": T_TILE_B,
         },
         4: {
-            "out_dir": (0, 1),
-            "block_dirs": [(-1, 0)],
+            "out_dir": Direction.UP,
+            "block_dirs": [Direction.LEFT],
             "texture_no": T_TILE_L,
         },
         5: {
-            "out_dir": (1, 0),
-            "block_dirs": [(0, 1), (-1, 0)],
+            "out_dir": Direction.RIGHT,
+            "block_dirs": [Direction.UP, Direction.LEFT],
             "texture_no": T_TILE_TL,
         },
         6: {
-            "out_dir": (0, -1),
-            "block_dirs": [(0, 1), (1, 0)],
+            "out_dir": Direction.DOWN,
+            "block_dirs": [Direction.UP, Direction.RIGHT],
             "texture_no": T_TILE_TR,
         },
         7: {
-            "out_dir": (-1, 0),
-            "block_dirs": [(1, 0), (0, -1)],
+            "out_dir": Direction.LEFT,
+            "block_dirs": [Direction.RIGHT, Direction.DOWN],
             "texture_no": T_TILE_BR,
         },
         8: {
-            "out_dir": (0, 1),
-            "block_dirs": [(-1, 0), (0, -1)],
+            "out_dir": Direction.UP,
+            "block_dirs": [Direction.LEFT, Direction.DOWN],
             "texture_no": T_TILE_BL,
         },
     }
@@ -183,7 +215,7 @@ class Chuchu(arcade.Sprite):
         move().
         """
         # The direction I'm moving in
-        self.my_direction = None
+        self.my_direction = Direction.NONE
 
         # Steps per tile
         self.my_speed = my_speed
@@ -198,14 +230,14 @@ class Chuchu(arcade.Sprite):
         self.texture = TEXTURES[C1_UP2]
 
         # The screen coordinates I'm moving towards
-        self.my_destination_screen_coordinates = (self.center_x, self.center_y)
+        self.my_destination_screen_coordinates = self.center_x, self.center_y
 
         # All chuchus start at their emitter
         self.position = my_emitter.position
 
         # My first move is in emit direction
         # This will calculate my destination screen coordinates
-        self.move(my_emitter.emit_vector)
+        self.move(my_emitter.emit_direction)
 
         # I have reached my destination, and I'm waiting for a new direction to move in.
         self.waiting_for_orders = False
@@ -218,23 +250,18 @@ class Chuchu(arcade.Sprite):
             print("I was drained. Yes!")
         self.kill()
 
-    def move(self, new_direction):
+    def move(self, new_direction: Direction):
         """
         Takes a direction and updates destination screen coordinates.
         """
-        # If the new_direction is NOT the null vector,
-        # I will continue in my current direction. Otherwise,
-        # I will change direction to new_direction
-        if new_direction != (0, 0):
-            # Current direction is updated
-            self.my_direction = new_direction
+        assert new_direction != Direction.NONE, "Told to move in direction None"
+        # Current direction is updated
+        self.my_direction = new_direction
 
-        # Update my screen destination relative to lower left of martrix
-        self.my_destination_screen_coordinates = [
-            n * TILE_SIZE for n in self.my_direction
-        ]
+        # Update my screen destination relative to lower left of matrix
+        self.my_destination_screen_coordinates = self.my_direction * TILE_SIZE
 
-        # Translate to screen position relative to lower left of window
+        # Update my screen destination relative to current position
         self.my_destination_screen_coordinates[0] += self.center_x
         self.my_destination_screen_coordinates[1] += self.center_y
 
@@ -279,7 +306,7 @@ class Emitter(arcade.Sprite):
     def __init__(
         self,
         on_tile,
-        emit_direction,
+        emit_direction: Direction,
         type,
         capacity=5,
         emit_rate=2.0,
@@ -309,7 +336,7 @@ class Emitter(arcade.Sprite):
         self.go_to_tile(on_tile)
 
         # Direction for the outspitted Chuchus
-        self.emit_vector = emit_direction
+        self.emit_direction = emit_direction
 
         # Create queue for waiting Chuchus
         self.chuchus_queue = arcade.SpriteList()
@@ -325,7 +352,6 @@ class Emitter(arcade.Sprite):
         self.position = self.on_tile.position
 
     def get_chuchu(self):
-
         if any(self.chuchus_queue) and self.emit_timer <= 0:
             self.emit_timer = self.emit_rate
             c = self.chuchus_queue.pop()
@@ -598,8 +624,8 @@ class MyGame(arcade.Window):
                 [8, 3, 3, 3, 3, 7],
             ],
             "emitters": [
-                {"pos": (4, 1), "emit_direction": (-1, 0), "image": 0},
-                {"pos": (2, 3), "emit_direction": (0, 1), "image": 0},
+                {"pos": (4, 1), "emit_direction": Direction.LEFT, "image": 0},
+                {"pos": (2, 3), "emit_direction": Direction.UP, "image": 0},
             ],
             "drains": [{"pos": (2, 0)}],
         },
@@ -611,7 +637,7 @@ class MyGame(arcade.Window):
                 [4, 0, 0, 0, 2],
                 [8, 3, 3, 3, 7],
             ],
-            "emitters": [{"pos": (3, 4), "emit_direction": (-1, 0), "image": 0}],
+            "emitters": [{"pos": (3, 4), "emit_direction": Direction.UP, "image": 0}],
             "drains": [{"pos": (2, 1)}],
         },
     }
@@ -723,9 +749,6 @@ class MyGame(arcade.Window):
         """
         Movement and game logic
         """
-
-        # Update the player shots
-        # self.player_shot_list.update()
 
         self.tile_matrix.update(delta_time)
 
