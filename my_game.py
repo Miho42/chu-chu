@@ -7,6 +7,7 @@ Artwork from https://kenney.nl/assets/space-shooter-redux
 
 """
 from enum import Enum
+from os import DirEntry
 from typing import List, Optional, Union
 import arcade
 
@@ -75,6 +76,7 @@ class Direction(Enum):
     """
     Directions in the game matrix.
     """
+
     UP = (0, 1)
     DOWN = (0, -1)
     LEFT = (-1, 0)
@@ -104,9 +106,6 @@ class Player(arcade.Sprite):
         Setup new Player object
         """
         self._tile_pos = (0, 0)
-
-        # Graphics to use for Player
-        kwargs["filename"] = "images/playerShip1_red.png"
 
         # How much to scale the graphics
         kwargs["scale"] = SPRITE_SCALING
@@ -489,15 +488,18 @@ class TileMatrix:
             position[1] * self.matrix_width + position[0] % self.matrix_width
         ]
 
-    def move_player(self, player_no: int, direction: list) -> None:
+    def move_player(self, player_no: int, direction: Direction) -> None:
         """
         The player is moved
         """
         p = self.players[player_no]
         # Current grid position
         current_pos = p.tile_pos
-        # New position in grid
-        new_pos = (current_pos[0] + direction[0], current_pos[1] + direction[1])
+        # New position in grid (Y axis inverted for pos)
+        new_pos = (
+            current_pos[0] + direction.value[0],
+            current_pos[1] + -1 * direction.value[1],
+        )
 
         # Return if new position is illegal
         if not -1 < new_pos[0] < self.matrix_width:
@@ -765,16 +767,16 @@ class MyGame(arcade.Window):
         # that is y is opposite of screen coordinatesystem.
         if key == arcade.key.UP:
             self.up_pressed = True
-            self.tile_matrix.move_player(0, (0, -1))
+            self.tile_matrix.move_player(0, Direction.UP)
         elif key == arcade.key.DOWN:
             self.down_pressed = True
-            self.tile_matrix.move_player(0, (0, 1))
+            self.tile_matrix.move_player(0, Direction.DOWN)
         elif key == arcade.key.LEFT:
             self.left_pressed = True
-            self.tile_matrix.move_player(0, (-1, 0))
+            self.tile_matrix.move_player(0, Direction.LEFT)
         elif key == arcade.key.RIGHT:
             self.right_pressed = True
-            self.tile_matrix.move_player(0, (1, 0))
+            self.tile_matrix.move_player(0, Direction.RIGHT)
 
         if key == FIRE_KEY:
             self.tile_matrix.add_annotation(0, Annotation())
