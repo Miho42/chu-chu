@@ -7,10 +7,14 @@ Artwork from https://kenney.nl/assets/space-shooter-redux
 
 """
 from enum import Enum
+from os import DirEntry
+from typing import List, Optional, Union
 import arcade
 
+# Print debug information
+DEBUG_ON = not True
 
-SPRITE_SCALING = 0.5
+SPRITE_SCALING = 4
 TILE_SCALING = 4
 TILE_SIZE = TILE_SCALING * 16
 
@@ -30,26 +34,86 @@ PLAYER_SHOT_SPEED = 4
 
 FIRE_KEY = arcade.key.SPACE
 
+TEXTURES = arcade.load_spritesheet(
+    file_name="images/urbanrpg/tilemap.png",
+    sprite_width=16,
+    sprite_height=16,
+    columns=27,
+    count=18 * 27,
+    margin=1,
+)
+
+# Indexes for tiles
+T_TILE_TL = 0
+T_TILE_T = 1
+T_TILE_TR = 2
+T_TILE_L = 1 * 27
+T_TILE_NONE = 1 * 27 + 1
+T_TILE_R = 1 * 27 + 2
+T_TILE_BR = 2 * 27 + 2
+T_TILE_BL = 2 * 27
+T_TILE_B = 2 * 27 + 1
+
+# Indexes for chuchus
+C1_UP1 = 25
+C1_UP2 = C1_UP1 + 27
+C1_UP3 = C1_UP2 + 27
+
+# Emitters
+E_E1 = 11 * 27 + 9
+
+# Drains
+D_D1 = 11 * 27 + 13
+
+# Annotations
+A_UP1 = 7 * 27 + 1
+
+# Players
+P_P1 = 9 * 27 + 2
+
+
+class Direction(Enum):
+    """
+    Directions in the game matrix.
+    """
+
+    UP = (0, 1)
+    DOWN = (0, -1)
+    LEFT = (-1, 0)
+    RIGHT = (1, 0)
+    NONE = (0, 0)
+
+    def __bool__(self) -> bool:
+        """
+        The None direction is False
+        """
+        return self.value != (0, 0)
+
+    def __mul__(self, other: Union[float, int]) -> List[Union[float, int]]:
+        """
+        Multiply all values in Direction
+        """
+        return [other * v for v in self.value]
+
 
 class Player(arcade.Sprite):
     """
     The player
     """
 
-    def __init__(self, tile_pos, **kwargs):
+    def __init__(self, **kwargs):
         """
         Setup new Player object
         """
-        self._tile_pos = tile_pos
-
-        # Graphics to use for Player
-        kwargs["filename"] = "images/playerShip1_red.png"
+        self._tile_pos = (0, 0)
 
         # How much to scale the graphics
         kwargs["scale"] = SPRITE_SCALING
 
         # Pass arguments to class arcade.Sprite
         super().__init__(**kwargs)
+
+        self.texture = TEXTURES[P_P1]
 
     @property
     def tile_pos(self):
@@ -71,16 +135,6 @@ class TileType(Enum):
     Tiles with wall. Prefix T mean tile. next character is wall on x-axis, last character is wall on y-axis.
     """
 
-    T__ = 0
-    T_T = 1
-    TR_ = 2
-    T_B = 3
-    TL_ = 4
-    TLT = 5
-    TRT = 6
-    TRB = 7
-    TLB = 8
-
 
 class Tile(arcade.Sprite):
     """
@@ -88,47 +142,64 @@ class Tile(arcade.Sprite):
     """
 
     types = {
-        0: {"out_dir": (0, 0), "block_dirs": [], "image": "wall_none.png"},
-        1: {"out_dir": (1, 0), "block_dirs": [(0, 1)], "image": "wall_top.png"},
-        2: {"out_dir": (0, -1), "block_dirs": [(1, 0)], "image": "wall_right.png"},
-        3: {"out_dir": (-1, 0), "block_dirs": [(0, -1)], "image": "wall_bottom.png"},
-        4: {"out_dir": (0, 1), "block_dirs": [(-1, 0)], "image": "wall_left.png"},
+        0: {"out_dir": Direction.NONE, "block_dirs": [], "texture_no": T_TILE_NONE},
+        1: {
+            "out_dir": Direction.RIGHT,
+            "block_dirs": [Direction.UP],
+            "texture_no": T_TILE_T,
+        },
+        2: {
+            "out_dir": Direction.DOWN,
+            "block_dirs": [Direction.RIGHT],
+            "texture_no": T_TILE_R,
+        },
+        3: {
+            "out_dir": Direction.LEFT,
+            "block_dirs": [Direction.DOWN],
+            "texture_no": T_TILE_B,
+        },
+        4: {
+            "out_dir": Direction.UP,
+            "block_dirs": [Direction.LEFT],
+            "texture_no": T_TILE_L,
+        },
         5: {
-            "out_dir": (1, 0),
-            "block_dirs": [(0, 1), (-1, 0)],
-            "image": "wall_top_left.png",
+            "out_dir": Direction.RIGHT,
+            "block_dirs": [Direction.UP, Direction.LEFT],
+            "texture_no": T_TILE_TL,
         },
         6: {
-            "out_dir": (0, -1),
-            "block_dirs": [(0, 1), (1, 0)],
-            "image": "wall_top_right.png",
+            "out_dir": Direction.DOWN,
+            "block_dirs": [Direction.UP, Direction.RIGHT],
+            "texture_no": T_TILE_TR,
         },
         7: {
-            "out_dir": (-1, 0),
-            "block_dirs": [(1, 0), (0, -1)],
-            "image": "wall_bottom_right.png",
+            "out_dir": Direction.LEFT,
+            "block_dirs": [Direction.RIGHT, Direction.DOWN],
+            "texture_no": T_TILE_BR,
         },
         8: {
-            "out_dir": (0, 1),
-            "block_dirs": [(-1, 0), (0, -1)],
-            "image": "wall_bottom_left.png",
+            "out_dir": Direction.UP,
+            "block_dirs": [Direction.LEFT, Direction.DOWN],
+            "texture_no": T_TILE_BL,
         },
     }
 
-    def __init__(self, type=0, **kwargs):
+    def __init__(self, type=0, center_x=0, center_y=0, **kwargs):
         """
         Setup new Tile object
         """
         self.my_type = Tile.types[type]
-
-        # Graphics to use for Tile
-        kwargs["filename"] = f'images/Tiles/{self.my_type["image"]}'
 
         # How much to scale the graphics
         kwargs["scale"] = TILE_SCALING
 
         # Pass arguments to class arcade.Sprite
         super().__init__(**kwargs)
+
+        self.texture = TEXTURES[self.my_type["texture_no"]]
+
+        self.position = center_x, center_y
 
 
 class Chuchu(arcade.Sprite):
@@ -143,13 +214,10 @@ class Chuchu(arcade.Sprite):
         move().
         """
         # The direction I'm moving in
-        self.my_direction = None
+        self.my_direction = Direction.NONE
 
         # Steps per tile
         self.my_speed = my_speed
-
-        # Graphics
-        kwargs["filename"] = "images/Chuchu/Chuchu.png"
 
         # Scale the graphics
         kwargs["scale"] = TILE_SCALING
@@ -157,15 +225,18 @@ class Chuchu(arcade.Sprite):
         # Pass arguments to class arcade.Sprite
         super().__init__(**kwargs)
 
+        # Graphics
+        self.texture = TEXTURES[C1_UP2]
+
         # The screen coordinates I'm moving towards
-        self.my_destination_screen_coordinates = (self.center_x, self.center_y)
+        self.my_destination_screen_coordinates = self.center_x, self.center_y
 
         # All chuchus start at their emitter
         self.position = my_emitter.position
 
         # My first move is in emit direction
         # This will calculate my destination screen coordinates
-        self.move(my_emitter.emit_vector)
+        self.move(my_emitter.emit_direction)
 
         # I have reached my destination, and I'm waiting for a new direction to move in.
         self.waiting_for_orders = False
@@ -174,27 +245,22 @@ class Chuchu(arcade.Sprite):
         """
         When a Chuchu reaches a drain and should no longer exist
         """
-
-        print("I was drained. Yes!")
+        if DEBUG_ON:
+            print("I was drained. Yes!")
         self.kill()
 
-    def move(self, new_direction):
+    def move(self, new_direction: Direction):
         """
         Takes a direction and updates destination screen coordinates.
         """
-        # If the new_direction is NOT the null vector,
-        # I will continue in my current direction. Otherwise,
-        # I will change direction to new_direction
-        if new_direction != (0, 0):
-            # Current direction is updated
-            self.my_direction = new_direction
+        assert new_direction != Direction.NONE, "Told to move in direction None"
+        # Current direction is updated
+        self.my_direction = new_direction
 
-        # Update my screen destination relative to lower left of martrix
-        self.my_destination_screen_coordinates = [
-            n * TILE_SIZE for n in self.my_direction
-        ]
+        # Update my screen destination relative to lower left of matrix
+        self.my_destination_screen_coordinates = self.my_direction * TILE_SIZE
 
-        # Translate to screen position relative to lower left of window
+        # Update my screen destination relative to current position
         self.my_destination_screen_coordinates[0] += self.center_x
         self.my_destination_screen_coordinates[1] += self.center_y
 
@@ -237,7 +303,13 @@ class Emitter(arcade.Sprite):
     emitter_types = {0: "images/Emitter/Emitter_jar.png"}
 
     def __init__(
-        self, on_tile, type=0, capacity=5, emit_vector=(-1, 0), emit_rate=2.0, **kwargs
+        self,
+        on_tile,
+        emit_direction: Direction,
+        type,
+        capacity=5,
+        emit_rate=2.0,
+        **kwargs,
     ):
         """
         Setup new Emitter
@@ -251,16 +323,19 @@ class Emitter(arcade.Sprite):
 
         self.capacity = capacity
 
-        kwargs["filename"] = Emitter.emitter_types[type]
         kwargs["scale"] = TILE_SCALING
 
         # Pass arguments to class arcade.Sprite
         super().__init__(**kwargs)
 
+        # kwargs["filename"] = Emitter.emitter_types[type]
+
+        self.texture = TEXTURES[E_E1]
+
         self.go_to_tile(on_tile)
 
         # Direction for the outspitted Chuchus
-        self.emit_vector = emit_vector
+        self.emit_direction = emit_direction
 
         # Create queue for waiting Chuchus
         self.chuchus_queue = arcade.SpriteList()
@@ -276,11 +351,11 @@ class Emitter(arcade.Sprite):
         self.position = self.on_tile.position
 
     def get_chuchu(self):
-
         if any(self.chuchus_queue) and self.emit_timer <= 0:
             self.emit_timer = self.emit_rate
             c = self.chuchus_queue.pop()
-            print(f"Number of Chuchus emitted: {self.no_emitted}")
+            if DEBUG_ON:
+                print(f"Number of Chuchus emitted: {self.no_emitted}")
             return c
 
     def update(self, delta_time):
@@ -294,12 +369,13 @@ class Drain(arcade.Sprite):
     """
 
     def __init__(self, on_tile, **kwargs):
-        kwargs["filename"] = "images/Drain/Drain_cream.png"
+
         kwargs["scale"] = TILE_SCALING
 
         # Pass arguments to class arcade.Sprite
         super().__init__(**kwargs)
 
+        self.texture = TEXTURES[D_D1]
         self.position = on_tile.position
 
         # Number of Chuchus drained
@@ -310,15 +386,18 @@ class Drain(arcade.Sprite):
         <chuchu> has been drained by me
         """
         self.no_drained += 1
-        print(f"I have drained a total number of {self.no_drained} chuchus :D")
+        if DEBUG_ON:
+            print(f"I have drained a total number of {self.no_drained} chuchus :D")
 
 
 class Annotation(arcade.Sprite):
     def __init__(self, **kwargs):
-        kwargs["filename"] = "images/Annotations/Annotation_2.png"
+        # kwargs["filename"] = "images/Annotations/Annotation_2.png"
         kwargs["scale"] = TILE_SCALING
         # Pass arguments to class arcade.Sprite
         super().__init__(**kwargs)
+
+        self.texture = TEXTURES[A_UP1]
 
 
 class TileMatrix:
@@ -330,55 +409,54 @@ class TileMatrix:
     def __init__(
         self,
         level_data,
-        matrix_width=5,
-        matrix_height=5,
         tile_size=TILE_SIZE,
-        matrix_offset_x=200,
-        matrix_offset_y=200,
+        matrix_offset_x=100,
+        matrix_offset_y=100,
     ):
-        # Create matrix
-        self.matrix = arcade.SpriteList()
+        # Ceate sprite lists
+        self.tiles = arcade.SpriteList()
+        self.chuchus = arcade.SpriteList()
+        self.emitters = arcade.SpriteList()
+        self.drains = arcade.SpriteList()
+        self.annotations = arcade.SpriteList()
+        self.players = arcade.SpriteList()
 
-        self.matrix_width = matrix_width
-        self.matrix_height = matrix_height
+        self.matrix_width = len(level_data["tiles"][0])
+        self.matrix_height = len(level_data["tiles"])
         self.matrix_offset_x = matrix_offset_x
         self.matrix_offset_y = matrix_offset_y
 
-        # Matrix is drawn bottom-up, but level is designed top-down
-        # It has to be reversed before rendering
-        reversed_tiles = []
-        for row in reversed(level_data["tiles"]):
-            reversed_tiles.extend(row)
+        # Add Tile objects with correct screen positions
+        new_tile_x = matrix_offset_x
+        new_tile_y = matrix_offset_y + (self.matrix_height - 1) * tile_size
+        for row in level_data["tiles"]:
+            self.tiles.extend(
+                [
+                    Tile(
+                        type=type,
+                        center_x=index * tile_size + new_tile_x,
+                        center_y=new_tile_y,
+                    )
+                    for index, type in enumerate(row)
+                ]
+            )
+            new_tile_y -= tile_size
 
-        # Append tiles to matrix
-        for i in range(matrix_width * matrix_height):
-            t = Tile(type=reversed_tiles[i])
-            t.center_x = ((i % matrix_width) * tile_size) + matrix_offset_x
-            t.center_y = ((i // matrix_height) * tile_size) + matrix_offset_y
-            self.matrix.append(t)
+        # self.tiles[0].texture = TileMatrix.textures[0]
 
-        # Create list for chuchus
-        self.chuchus = arcade.SpriteList()
+        # Add emitters
+        for e in level_data["emitters"]:
+            self.add_emitter(
+                Emitter(
+                    self.get_tile(e["pos"]),
+                    type=e["image"],
+                    emit_direction=e["emit_direction"],
+                )
+            )
 
-        # Create list for Players
-        self.players = arcade.SpriteList()
-        # Append player to playerlist with start position
-        self.players.append(Player(tile_pos=(1, 1)))
-
-        # Create list for Emitters
-        self.emitters = arcade.SpriteList()
-        # Find tile to stand on
-        emitter_dest_tile = self.matrix[level_data["emitter"]["pos"]]
-        # Create emitter and tell it where to stand
-        emitter = Emitter(emitter_dest_tile, type=level_data["emitter"]["image"])
-        self.add_emitter(emitter)
-
-        # Create list for drains
-        self.drains = arcade.SpriteList()
-        self.add_drain(Drain(self.matrix[level_data["drain"]["pos"]]))
-
-        # Create list for annotations
-        self.annotations = arcade.SpriteList()
+        # Add drains
+        for d in level_data["drains"]:
+            self.add_drain(Drain(self.get_tile(d["pos"])))
 
     @property
     def level_clear(self):
@@ -392,31 +470,52 @@ class TileMatrix:
         else:
             return False
 
-    def move_player(self, player_no: int, dir: list):
+    def get_tile(self, position):
+        """
+        Return tile object on <position> in matrix
+        """
+        return self.tiles[
+            position[1] * self.matrix_width + position[0] % self.matrix_width
+        ]
+
+    def move_player(self, player_no: int, direction: Direction) -> None:
         """
         The player is moved
         """
         p = self.players[player_no]
         # Current grid position
         current_pos = p.tile_pos
-        # New position in grid
-        new_pos = (current_pos[0] + dir[0], current_pos[1] + dir[1])
+        # New position in grid (Y axis inverted for pos)
+        new_pos = (
+            current_pos[0] + direction.value[0],
+            current_pos[1] + -1 * direction.value[1],
+        )
 
-        # Check if new position is legal
+        # Return if new position is illegal
         if not -1 < new_pos[0] < self.matrix_width:
             return None
         if not -1 < new_pos[1] < self.matrix_height:
             return None
 
         # Update player position in grid
-        self.players[player_no].tile_pos = new_pos
+        p.tile_pos = new_pos
+        # Update player's screen coordinates to
+        # match tile on new position
+        p.position = self.get_tile(new_pos).position
 
-        # FIXME this should be handled in the player
-        # Update player position on screen
-        p.center_x = p.tile_pos[0] * TILE_SIZE + self.matrix_offset_x
-        p.center_y = p.tile_pos[1] * TILE_SIZE + self.matrix_offset_y
+    def add_player(self, player: Player, tile_pos) -> int:
+        """
+        Add a player to the game
+        """
+        player.tile_pos = tile_pos
+        player.position = self.get_tile(tile_pos).position
+        self.players.append(player)
+        return self.players.index(player)
 
     def add_annotation(self, player_no, annotation: Annotation):
+        """
+        Add an annotation at the position of the player
+        """
         annotation.position = self.players[player_no].position
         self.annotations.append(annotation)
 
@@ -446,13 +545,13 @@ class TileMatrix:
                 return t
         return None
 
-    def draw(self):
-        self.matrix.draw()
-        self.annotations.draw()
-        self.emitters.draw()
-        self.drains.draw()
-        self.chuchus.draw()
-        self.players.draw()
+    def draw(self, pixelated=True):
+        self.tiles.draw(pixelated=pixelated)
+        self.annotations.draw(pixelated=pixelated)
+        self.emitters.draw(pixelated=pixelated)
+        self.drains.draw(pixelated=pixelated)
+        self.chuchus.draw(pixelated=pixelated)
+        self.players.draw(pixelated=pixelated)
 
     def update(self, delta_time):
 
@@ -483,7 +582,7 @@ class TileMatrix:
 
                 # Look at tiles
                 current_tile = self.get_sprite_from_screen_coordinates(
-                    c.position, self.matrix
+                    c.position, self.tiles
                 )
                 assert current_tile is not None, "Chuchu was not on any tile"
                 # Assume Chuchu is moving on
@@ -501,36 +600,6 @@ class TileMatrix:
             p.update(delta_time)
 
 
-class PlayerShot(arcade.Sprite):
-    """
-    A shot fired by the Player
-    """
-
-    def __init__(self, center_x=0, center_y=0):
-        """
-        Setup new PlayerShot object
-        """
-
-        # Set the graphics to use for the sprite
-        super().__init__("images/Lasers/laserBlue01.png", SPRITE_SCALING)
-
-        self.center_x = center_x
-        self.center_y = center_y
-        self.change_y = PLAYER_SHOT_SPEED
-
-    def update(self, delta_time):
-        """
-        Move the sprite
-        """
-
-        # Update y position
-        self.center_y += self.change_y
-
-        # Remove shot when over top of screen
-        if self.bottom > SCREEN_HEIGHT:
-            self.kill()
-
-
 class MyGame(arcade.Window):
     """
     Main application class.
@@ -540,14 +609,17 @@ class MyGame(arcade.Window):
     levels = {
         1: {
             "tiles": [
-                [5, 1, 1, 1, 6],
-                [4, 0, 0, 0, 2],
-                [4, 0, 0, 0, 2],
-                [4, 0, 0, 0, 2],
-                [8, 3, 3, 3, 7],
+                [5, 1, 1, 1, 1, 6],
+                [4, 0, 0, 0, 0, 2],
+                [4, 0, 0, 0, 0, 2],
+                [4, 0, 0, 0, 0, 2],
+                [8, 3, 3, 3, 3, 7],
             ],
-            "emitter": {"pos": (24), "image": 0},
-            "drain": {"pos": (5)},
+            "emitters": [
+                {"pos": (4, 1), "emit_direction": Direction.LEFT, "image": 0},
+                {"pos": (2, 3), "emit_direction": Direction.UP, "image": 0},
+            ],
+            "drains": [{"pos": (2, 0)}],
         },
         2: {
             "tiles": [
@@ -557,8 +629,8 @@ class MyGame(arcade.Window):
                 [4, 0, 0, 0, 2],
                 [8, 3, 3, 3, 7],
             ],
-            "emitter": {"pos": (1), "image": 0},
-            "drain": {"pos": (2)},
+            "emitters": [{"pos": (3, 4), "emit_direction": Direction.UP, "image": 0}],
+            "drains": [{"pos": (2, 1)}],
         },
     }
 
@@ -570,13 +642,11 @@ class MyGame(arcade.Window):
         # Call the parent class initializer
         super().__init__(width, height)
 
-        # Variable that will hold a list of shots fired by the player
-        self.player_shot_list = None
-
         # Set up the player info
         self.player_sprite = None
         self.player_score = None
         self.player_lives = None
+        self.players = None
 
         # Set up matrix
         self.tile_matrix = None
@@ -625,12 +695,11 @@ class MyGame(arcade.Window):
         # No of lives
         self.player_lives = PLAYER_LIVES
 
-        # Sprite lists
-        self.player_shot_list = arcade.SpriteList()
-
         # Start at level 1
         self.level = 1
 
+        self.players = arcade.SpriteList()
+        self.players.append(Player())
         self.start_level()
 
     def start_level(self):
@@ -639,6 +708,11 @@ class MyGame(arcade.Window):
             self.level in MyGame.levels.keys()
         ), f"Error: no data for level {self.level}"
         self.tile_matrix = TileMatrix(level_data=MyGame.levels[self.level])
+        # Add a player to the game
+        for p in self.players:
+            p_no = self.tile_matrix.add_player(p, (1, 1))
+            if DEBUG_ON:
+                print(f"Added player as no. {p_no}")
 
     def end_level(self):
         self.level += 1
@@ -651,9 +725,6 @@ class MyGame(arcade.Window):
 
         # This command has to happen before we start drawing
         arcade.start_render()
-
-        # Draw the player shot
-        self.player_shot_list.draw()
 
         # Draw players score on screen
         arcade.draw_text(
@@ -671,9 +742,6 @@ class MyGame(arcade.Window):
         Movement and game logic
         """
 
-        # Update the player shots
-        # self.player_shot_list.update()
-
         self.tile_matrix.update(delta_time)
 
         if self.tile_matrix.level_clear:
@@ -685,26 +753,23 @@ class MyGame(arcade.Window):
         """
 
         # Track state of arrow keys
+        # These directions are in level coordinates,
+        # that is y is opposite of screen coordinatesystem.
         if key == arcade.key.UP:
             self.up_pressed = True
-            self.tile_matrix.move_player(0, (0, 1))
+            self.tile_matrix.move_player(0, Direction.UP)
         elif key == arcade.key.DOWN:
             self.down_pressed = True
-            self.tile_matrix.move_player(0, (0, -1))
+            self.tile_matrix.move_player(0, Direction.DOWN)
         elif key == arcade.key.LEFT:
             self.left_pressed = True
-            self.tile_matrix.move_player(0, (-1, 0))
+            self.tile_matrix.move_player(0, Direction.LEFT)
         elif key == arcade.key.RIGHT:
             self.right_pressed = True
-            self.tile_matrix.move_player(0, (1, 0))
+            self.tile_matrix.move_player(0, Direction.RIGHT)
 
         if key == FIRE_KEY:
-            # new_shot = PlayerShot(
-            #    self.player_sprite.center_x, self.player_sprite.center_y
-            # )
             self.tile_matrix.add_annotation(0, Annotation())
-
-            # self.player_shot_list.append(new_shot)
 
     def on_key_release(self, key, modifiers):
         """
