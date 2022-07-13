@@ -410,8 +410,8 @@ class TileMatrix:
         self,
         level_data,
         tile_size=TILE_SIZE,
-        matrix_offset_x=100,
-        matrix_offset_y=100,
+        matrix_offset_x=50,
+        matrix_offset_y=50,
     ):
         # Ceate sprite lists
         self.tiles = arcade.SpriteList()
@@ -605,32 +605,56 @@ class MyGame(arcade.Window):
     Main application class.
     """
 
-    # Drawn upside down
     levels = {
         1: {
             "tiles": [
-                [5, 1, 1, 1, 1, 6],
-                [4, 0, 0, 0, 0, 2],
-                [4, 0, 0, 0, 0, 2],
-                [4, 0, 0, 0, 0, 2],
-                [8, 3, 3, 3, 3, 7],
+                [5, 1, 1, 1, 6, 5, 1, 1, 1, 1, 1, 6],
+                [4, 0, 0, 0, 2, 4, 0, 0, 0, 0, 0, 2],
+                [4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
+                [4, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 7],
+                [8, 3, 3, 0, 0, 0, 0, 0, 0, 1, 1, 6],
+                [5, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 2],
+                [4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
+                [4, 0, 0, 0, 0, 0, 2, 4, 0, 0, 0, 2],
+                [8, 3, 3, 3, 3, 3, 7, 8, 3, 3, 3, 7],
             ],
             "emitters": [
-                {"pos": (4, 1), "emit_direction": Direction.LEFT, "image": 0},
-                {"pos": (2, 3), "emit_direction": Direction.UP, "image": 0},
+                {"pos": (4, 3), "emit_direction": Direction.RIGHT, "image": 0},
+                {"pos": (7, 3), "emit_direction": Direction.DOWN, "image": 0},
+                {"pos": (4, 5), "emit_direction": Direction.LEFT, "image": 0},
+                {"pos": (7, 5), "emit_direction": Direction.UP, "image": 0},
             ],
-            "drains": [{"pos": (2, 0)}],
+            "drains": [
+                {"pos": (1, 1)},
+                {"pos": (10, 1)},
+                {"pos": (10, 7)},
+                {"pos": (1, 7)},
+            ],
         },
         2: {
             "tiles": [
-                [5, 1, 6, 5, 6],
-                [4, 0, 2, 4, 2],
-                [4, 0, 2, 4, 2],
-                [4, 0, 0, 0, 2],
-                [8, 3, 3, 3, 7],
+                [5, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 6],
+                [5, 1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 7],
+                [8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6],
+                [5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7],
+                [8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6],
+                [5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7],
+                [8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6],
+                [5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
+                [8, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 7],
             ],
-            "emitters": [{"pos": (3, 4), "emit_direction": Direction.UP, "image": 0}],
-            "drains": [{"pos": (2, 1)}],
+            "emitters": [
+                {"pos": (0, 0), "emit_direction": Direction.RIGHT, "image": 0},
+                {"pos": (3, 0), "emit_direction": Direction.RIGHT, "image": 0},
+                {"pos": (6, 0), "emit_direction": Direction.RIGHT, "image": 0},
+                {"pos": (9, 0), "emit_direction": Direction.RIGHT, "image": 0},
+            ],
+            "drains": [
+                {"pos": (1, 7)},
+                {"pos": (4, 7)},
+                {"pos": (7, 7)},
+                {"pos": (10, 7)},
+            ],
         },
     }
 
@@ -696,7 +720,7 @@ class MyGame(arcade.Window):
         self.player_lives = PLAYER_LIVES
 
         # Start at level 1
-        self.level = 1
+        self.level = 2
 
         self.players = arcade.SpriteList()
         self.players.append(Player())
