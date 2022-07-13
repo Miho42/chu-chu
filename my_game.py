@@ -406,16 +406,6 @@ class TileMatrix:
     Consists of chuchus
     """
 
-    # Load textures
-    textures = arcade.load_spritesheet(
-        file_name="images/urbanrpg/tilemap.png",
-        sprite_width=16,
-        sprite_height=16,
-        columns=27,
-        count=18 * 27,
-        margin=1,
-    )
-
     def __init__(
         self,
         level_data,
