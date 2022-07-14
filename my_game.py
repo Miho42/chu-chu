@@ -398,10 +398,9 @@ class Annotation(arcade.Sprite):
         self.texture = TEXTURES[A_UP1]
 
 
-class TileMatrix:
+class Level:
     """
-    Matrix of Tile(s) >:)
-    Consists of chuchus
+    An instantiated level in the game
     """
 
     def __init__(
@@ -440,11 +439,9 @@ class TileMatrix:
             )
             new_tile_y -= tile_size
 
-        # self.tiles[0].texture = TileMatrix.textures[0]
-
         # Add emitters
         for e in level_data["emitters"]:
-            self.add_emitter(
+            self.emitters.append(
                 Emitter(
                     self.get_tile(e["pos"]),
                     type=e["image"],
@@ -454,7 +451,7 @@ class TileMatrix:
 
         # Add drains
         for d in level_data["drains"]:
-            self.add_drain(Drain(self.get_tile(d["pos"])))
+            self.drains.append(Drain(self.get_tile(d["pos"])))
 
     @property
     def level_clear(self):
@@ -470,7 +467,7 @@ class TileMatrix:
 
     def get_tile(self, position):
         """
-        Return tile object on <position> in matrix
+        Return tile object on <position> in level list
         """
         return self.tiles[
             position[1] * self.matrix_width + position[0] % self.matrix_width
@@ -478,7 +475,7 @@ class TileMatrix:
 
     def move_player(self, player_no: int, direction: Direction) -> None:
         """
-        The player is moved
+        Move a player
         """
         p = self.players[player_no]
         # Current grid position
@@ -516,18 +513,6 @@ class TileMatrix:
         """
         annotation.position = self.players[player_no].position
         self.annotations.append(annotation)
-
-    def add_emitter(self, emitter: arcade.Sprite):
-        """
-        Append emitter to list of emitters
-        """
-        self.emitters.append(emitter)
-
-    def add_drain(self, drain: arcade.Sprite):
-        """
-        Append drain to list of drains
-        """
-        self.drains.append(drain)
 
     def get_sprite_from_screen_coordinates(self, coordinates, sprite_list):
         """
@@ -723,7 +708,7 @@ class MyGame(arcade.Window):
         assert (
             self.level in MyGame.levels.keys()
         ), f"Error: no data for level {self.level}"
-        self.tile_matrix = TileMatrix(level_data=MyGame.levels[self.level])
+        self.tile_matrix = Level(level_data=MyGame.levels[self.level])
         # Add a player to the game
         for p in self.players:
             p_no = self.tile_matrix.add_player(p, (1, 1))
