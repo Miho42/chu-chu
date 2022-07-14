@@ -141,46 +141,44 @@ class Tile(arcade.Sprite):
     A tile :)
     """
 
+    # The value of Direction keys, are the Directions a ChuChu should move
+    # after having entered the tile from the key Direction
     types = {
-        0: {"out_dir": Direction.NONE, "block_dirs": [], "texture_no": T_TILE_NONE},
+        0: {"texture_no": T_TILE_NONE},
         1: {
-            "out_dir": Direction.RIGHT,
-            "block_dirs": [Direction.UP],
+            Direction.UP: Direction.RIGHT,
             "texture_no": T_TILE_T,
         },
         2: {
-            "out_dir": Direction.DOWN,
-            "block_dirs": [Direction.RIGHT],
+            Direction.RIGHT: Direction.DOWN,
             "texture_no": T_TILE_R,
         },
         3: {
-            "out_dir": Direction.LEFT,
-            "block_dirs": [Direction.DOWN],
+            Direction.DOWN: Direction.LEFT,
             "texture_no": T_TILE_B,
         },
         4: {
-            "out_dir": Direction.UP,
-            "block_dirs": [Direction.LEFT],
+            Direction.LEFT: Direction.UP,
             "texture_no": T_TILE_L,
         },
         5: {
-            "out_dir": Direction.RIGHT,
-            "block_dirs": [Direction.UP, Direction.LEFT],
+            Direction.UP: Direction.RIGHT,
+            Direction.LEFT: Direction.DOWN,
             "texture_no": T_TILE_TL,
         },
         6: {
-            "out_dir": Direction.DOWN,
-            "block_dirs": [Direction.UP, Direction.RIGHT],
+            Direction.RIGHT: Direction.DOWN,
+            Direction.UP: Direction.LEFT,
             "texture_no": T_TILE_TR,
         },
         7: {
-            "out_dir": Direction.LEFT,
-            "block_dirs": [Direction.RIGHT, Direction.DOWN],
+            Direction.DOWN: Direction.LEFT,
+            Direction.RIGHT: Direction.UP,
             "texture_no": T_TILE_BR,
         },
         8: {
-            "out_dir": Direction.UP,
-            "block_dirs": [Direction.LEFT, Direction.DOWN],
+            Direction.LEFT: Direction.UP,
+            Direction.DOWN: Direction.RIGHT,
             "texture_no": T_TILE_BL,
         },
     }
@@ -189,7 +187,7 @@ class Tile(arcade.Sprite):
         """
         Setup new Tile object
         """
-        self.my_type = Tile.types[type]
+        self.__type = type
 
         # How much to scale the graphics
         kwargs["scale"] = TILE_SCALING
@@ -197,9 +195,15 @@ class Tile(arcade.Sprite):
         # Pass arguments to class arcade.Sprite
         super().__init__(**kwargs)
 
-        self.texture = TEXTURES[self.my_type["texture_no"]]
+        self.texture = TEXTURES[Tile.types[self.__type]["texture_no"]]
 
         self.position = center_x, center_y
+
+    def get_out_direction(self, direction_in: Direction) -> Direction:
+        """
+        Return the direction to move in if Tile was entered from <direction_in>
+        """
+        return Tile.types[self.__type].get(direction_in, direction_in)
 
 
 class Chuchu(arcade.Sprite):
@@ -580,19 +584,13 @@ class TileMatrix:
                     # Nothing more to do for this Chuchu
                     break
 
-                # Look at tiles
+                # Get the tile the waiting ChuChu is on
                 current_tile = self.get_sprite_from_screen_coordinates(
                     c.position, self.tiles
                 )
                 assert current_tile is not None, "Chuchu was not on any tile"
-                # Assume Chuchu is moving on
-                new_direction = c.my_direction
-
-                # If Chuchus current direction is blocked by the tile the direction is changed to the tile's out direction
-                if c.my_direction in current_tile.my_type["block_dirs"]:
-                    new_direction = current_tile.my_type["out_dir"]
-
-                c.move(new_direction)
+                # Potentially change direction
+                c.move(current_tile.get_out_direction(c.my_direction))
 
             c.update(delta_time)
 
