@@ -130,12 +130,6 @@ class Player(arcade.Sprite):
         pass
 
 
-class TileType(Enum):
-    """
-    Tiles with wall. Prefix T mean tile. next character is wall on x-axis, last character is wall on y-axis.
-    """
-
-
 class Tile(arcade.Sprite):
     """
     A tile :)
