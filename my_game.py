@@ -140,12 +140,6 @@ class Player(arcade.Sprite):
     def tile_pos(self, new_pos):
         self._tile_pos = new_pos
 
-    def update(self, delta_time):
-        """
-        Move the sprite
-        """
-        pass
-
 
 class Tile(arcade.Sprite):
     """
@@ -308,7 +302,7 @@ class Chuchu(arcade.Sprite):
 
         self.waiting_for_orders = False
 
-    def update(self, delta_time):
+    def on_update(self, delta_time):
         """
         Move chuchu towards destination coordinates if not there yet.
         """
@@ -388,7 +382,7 @@ class Emitter(arcade.Sprite):
                 print(f"Number of Chuchus emitted: {self.no_emitted}")
             return c
 
-    def update(self, delta_time):
+    def on_update(self, delta_time):
         if self.emit_timer > 0:
             self.emit_timer -= delta_time
 
@@ -573,7 +567,7 @@ class Level:
         self.chuchus.draw(pixelated=pixelated)
         self.players.draw(pixelated=pixelated)
 
-    def update(self, delta_time):
+    def on_update(self, delta_time):
 
         # Pull chuchus from emitters
         for e in self.emitters:
@@ -583,7 +577,7 @@ class Level:
                 self.chuchus.append(c)
 
             # Update emitter
-            e.update(delta_time)
+            e.on_update(delta_time)
 
         # Handle waiting Chuchus
         for c in self.chuchus:
@@ -608,10 +602,7 @@ class Level:
                 # Potentially change direction
                 c.move(current_tile.get_out_direction(c.my_direction))
 
-            c.update(delta_time)
-
-        for p in self.players:
-            p.update(delta_time)
+            c.on_update(delta_time)
 
 
 class MyGame(arcade.Window):
@@ -780,7 +771,7 @@ class MyGame(arcade.Window):
         Movement and game logic
         """
 
-        self.tile_matrix.update(delta_time)
+        self.tile_matrix.on_update(delta_time)
 
         if self.tile_matrix.level_clear:
             self.end_level()
