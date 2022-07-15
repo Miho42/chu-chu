@@ -17,6 +17,8 @@ DEBUG_ON = not True
 SPRITE_SCALING = 4
 TILE_SCALING = 4
 TILE_SIZE = TILE_SCALING * 16
+# Time in ms for each keyframe
+CHUCHU_ANIMATION_SPEED = 300
 
 # When Chuchu is closer to destination than this, it has arrived
 IS_ON_TILE_DIFF = 1.0
@@ -219,10 +221,75 @@ class Tile(arcade.Sprite):
         return walls
 
 
-class Chuchu(arcade.Sprite):
+class Chuchu(arcade.AnimatedTimeBasedSprite):
     """
     A Chuchu (AKA a mouse)
     """
+
+    # The textures to use in animation for a ChuChu based on direction
+    frames = {
+        Direction.UP: [
+            arcade.AnimationKeyframe(
+                tile_id=1, duration=CHUCHU_ANIMATION_SPEED, texture=TEXTURES[C1_UP1]
+            ),
+            arcade.AnimationKeyframe(
+                tile_id=2, duration=CHUCHU_ANIMATION_SPEED, texture=TEXTURES[C1_UP2]
+            ),
+            arcade.AnimationKeyframe(
+                tile_id=3, duration=CHUCHU_ANIMATION_SPEED, texture=TEXTURES[C1_UP1]
+            ),
+            arcade.AnimationKeyframe(
+                tile_id=4, duration=CHUCHU_ANIMATION_SPEED, texture=TEXTURES[C1_UP3]
+            ),
+        ],
+        Direction.RIGHT: [
+            arcade.AnimationKeyframe(
+                tile_id=1, duration=CHUCHU_ANIMATION_SPEED, texture=TEXTURES[C1_RIGHT1]
+            ),
+            arcade.AnimationKeyframe(
+                tile_id=2, duration=CHUCHU_ANIMATION_SPEED, texture=TEXTURES[C1_RIGHT2]
+            ),
+            arcade.AnimationKeyframe(
+                tile_id=3, duration=CHUCHU_ANIMATION_SPEED, texture=TEXTURES[C1_RIGHT1]
+            ),
+            arcade.AnimationKeyframe(
+                tile_id=4, duration=CHUCHU_ANIMATION_SPEED, texture=TEXTURES[C1_RIGHT3]
+            ),
+        ],
+        Direction.DOWN: [
+            arcade.AnimationKeyframe(
+                tile_id=1, duration=CHUCHU_ANIMATION_SPEED, texture=TEXTURES[C1_DOWN1]
+            ),
+            arcade.AnimationKeyframe(
+                tile_id=2, duration=CHUCHU_ANIMATION_SPEED, texture=TEXTURES[C1_DOWN2]
+            ),
+            arcade.AnimationKeyframe(
+                tile_id=3, duration=CHUCHU_ANIMATION_SPEED, texture=TEXTURES[C1_DOWN1]
+            ),
+            arcade.AnimationKeyframe(
+                tile_id=4, duration=CHUCHU_ANIMATION_SPEED, texture=TEXTURES[C1_DOWN3]
+            ),
+        ],
+        Direction.LEFT: [
+            arcade.AnimationKeyframe(
+                tile_id=1, duration=CHUCHU_ANIMATION_SPEED, texture=TEXTURES[C1_LEFT1]
+            ),
+            arcade.AnimationKeyframe(
+                tile_id=2, duration=CHUCHU_ANIMATION_SPEED, texture=TEXTURES[C1_LEFT2]
+            ),
+            arcade.AnimationKeyframe(
+                tile_id=3, duration=CHUCHU_ANIMATION_SPEED, texture=TEXTURES[C1_LEFT1]
+            ),
+            arcade.AnimationKeyframe(
+                tile_id=4, duration=CHUCHU_ANIMATION_SPEED, texture=TEXTURES[C1_LEFT3]
+            ),
+        ],
+        Direction.NONE: [
+            arcade.AnimationKeyframe(
+                tile_id=1, duration=CHUCHU_ANIMATION_SPEED, texture=TEXTURES[C1_DOWN1]
+            ),
+        ],
+    }
 
     def __init__(self, my_emitter, my_speed=2, **kwargs):
         """
@@ -241,9 +308,6 @@ class Chuchu(arcade.Sprite):
 
         # Pass arguments to class arcade.Sprite
         super().__init__(**kwargs)
-
-        # Graphics
-        self.texture = TEXTURES[C1_UP2]
 
         # The screen coordinates I'm moving towards
         self.my_destination_screen_coordinates = self.center_x, self.center_y
@@ -289,16 +353,7 @@ class Chuchu(arcade.Sprite):
             self.my_destination_screen_coordinates[1] - self.center_y
         ) / self.my_speed
 
-        if new_direction == Direction.UP:
-            self.texture = TEXTURES[C1_UP1]
-        elif new_direction == Direction.RIGHT:
-            self.texture = TEXTURES[C1_RIGHT1]
-        elif new_direction == Direction.DOWN:
-            self.texture = TEXTURES[C1_DOWN1]
-        elif new_direction == Direction.LEFT:
-            self.texture = TEXTURES[C1_LEFT1]
-        else:
-            raise ValueError("New direction is no direction")
+        self.frames = Chuchu.frames[self.my_direction]
 
         self.waiting_for_orders = False
 
@@ -306,6 +361,7 @@ class Chuchu(arcade.Sprite):
         """
         Move chuchu towards destination coordinates if not there yet.
         """
+        self.update_animation(delta_time)
         if (
             arcade.get_distance(
                 self.my_destination_screen_coordinates[0],
