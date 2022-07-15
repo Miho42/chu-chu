@@ -36,6 +36,10 @@ PLAYER_START_X = SCREEN_WIDTH / 2
 PLAYER_START_Y = 50
 PLAYER_SHOT_SPEED = 4
 
+# Number of seconds to show alternative texture
+# for drains when a ChuChu has been drained
+DRAIN_OPEN_TIME = 0.5
+
 # Annotations will disapear after this many seconds
 ANNOTATION_LIFETIME_SECONDS = 10
 
@@ -82,7 +86,8 @@ C1_RIGHT3 = C1_RIGHT2 + 27
 E_E1 = 11 * 27 + 9
 
 # Drains
-D_D1 = 11 * 27 + 13
+D1_CLOSED = 10 * 27 + 13
+D1_OPEN = D1_CLOSED + 27
 
 # Annotations
 A_UP1 = 7 * 27 + 1
@@ -424,19 +429,35 @@ class Drain(arcade.Sprite):
         # Pass arguments to class arcade.Sprite
         super().__init__(**kwargs)
 
-        self.texture = TEXTURES[D_D1]
+        # self.texture = TEXTURES[D1_CLOSED]
         self.position = on_tile.position
 
         # Number of Chuchus drained
         self.no_drained = 0
+
+        # How long to show alternative texture when darining a ChuChu
+        self.open_time_seconds = 0
+
+        self.frames = [TEXTURES[D1_CLOSED], TEXTURES[D1_OPEN]]
+        self.texture = self.frames[0]
 
     def drained(self, chuchu):
         """
         <chuchu> has been drained by me
         """
         self.no_drained += 1
+        self.texture = self.frames[1]
+        self.open_time_seconds = DRAIN_OPEN_TIME
         if DEBUG_ON:
             print(f"I have drained a total number of {self.no_drained} chuchus :D")
+
+    def on_update(self, delta_time):
+
+        if self.open_time_seconds > 0:
+            self.open_time_seconds -= delta_time
+        elif self.open_time_seconds < 0:
+            self.texture = self.frames[0]
+            self.open_time_seconds = 0
 
 
 class Annotation(arcade.Sprite):
@@ -625,6 +646,7 @@ class Level:
 
         # Remove expired annotations
         self.annotations.on_update(delta_time)
+        self.drains.on_update(delta_time)
 
         # Pull ChuChus from emitters
         for e in self.emitters:
