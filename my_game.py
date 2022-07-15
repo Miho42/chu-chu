@@ -230,64 +230,27 @@ class Chuchu(arcade.AnimatedTimeBasedSprite):
     frames = {
         Direction.UP: [
             arcade.AnimationKeyframe(
-                tile_id=1, duration=CHUCHU_ANIMATION_SPEED, texture=TEXTURES[C1_UP1]
-            ),
-            arcade.AnimationKeyframe(
-                tile_id=2, duration=CHUCHU_ANIMATION_SPEED, texture=TEXTURES[C1_UP2]
-            ),
-            arcade.AnimationKeyframe(
-                tile_id=3, duration=CHUCHU_ANIMATION_SPEED, texture=TEXTURES[C1_UP1]
-            ),
-            arcade.AnimationKeyframe(
-                tile_id=4, duration=CHUCHU_ANIMATION_SPEED, texture=TEXTURES[C1_UP3]
-            ),
+                tile_id=i, duration=CHUCHU_ANIMATION_SPEED, texture=TEXTURES[t]
+            )
+            for i, t in enumerate((C1_UP1, C1_UP2, C1_UP1, C1_UP3))
         ],
         Direction.RIGHT: [
             arcade.AnimationKeyframe(
-                tile_id=1, duration=CHUCHU_ANIMATION_SPEED, texture=TEXTURES[C1_RIGHT1]
-            ),
-            arcade.AnimationKeyframe(
-                tile_id=2, duration=CHUCHU_ANIMATION_SPEED, texture=TEXTURES[C1_RIGHT2]
-            ),
-            arcade.AnimationKeyframe(
-                tile_id=3, duration=CHUCHU_ANIMATION_SPEED, texture=TEXTURES[C1_RIGHT1]
-            ),
-            arcade.AnimationKeyframe(
-                tile_id=4, duration=CHUCHU_ANIMATION_SPEED, texture=TEXTURES[C1_RIGHT3]
-            ),
+                tile_id=i, duration=CHUCHU_ANIMATION_SPEED, texture=TEXTURES[t]
+            )
+            for i, t in enumerate((C1_RIGHT1, C1_RIGHT2, C1_RIGHT1, C1_RIGHT3))
         ],
         Direction.DOWN: [
             arcade.AnimationKeyframe(
-                tile_id=1, duration=CHUCHU_ANIMATION_SPEED, texture=TEXTURES[C1_DOWN1]
-            ),
-            arcade.AnimationKeyframe(
-                tile_id=2, duration=CHUCHU_ANIMATION_SPEED, texture=TEXTURES[C1_DOWN2]
-            ),
-            arcade.AnimationKeyframe(
-                tile_id=3, duration=CHUCHU_ANIMATION_SPEED, texture=TEXTURES[C1_DOWN1]
-            ),
-            arcade.AnimationKeyframe(
-                tile_id=4, duration=CHUCHU_ANIMATION_SPEED, texture=TEXTURES[C1_DOWN3]
-            ),
+                tile_id=i, duration=CHUCHU_ANIMATION_SPEED, texture=TEXTURES[t]
+            )
+            for i, t in enumerate((C1_DOWN1, C1_DOWN2, C1_DOWN1, C1_DOWN3))
         ],
         Direction.LEFT: [
             arcade.AnimationKeyframe(
-                tile_id=1, duration=CHUCHU_ANIMATION_SPEED, texture=TEXTURES[C1_LEFT1]
-            ),
-            arcade.AnimationKeyframe(
-                tile_id=2, duration=CHUCHU_ANIMATION_SPEED, texture=TEXTURES[C1_LEFT2]
-            ),
-            arcade.AnimationKeyframe(
-                tile_id=3, duration=CHUCHU_ANIMATION_SPEED, texture=TEXTURES[C1_LEFT1]
-            ),
-            arcade.AnimationKeyframe(
-                tile_id=4, duration=CHUCHU_ANIMATION_SPEED, texture=TEXTURES[C1_LEFT3]
-            ),
-        ],
-        Direction.NONE: [
-            arcade.AnimationKeyframe(
-                tile_id=1, duration=CHUCHU_ANIMATION_SPEED, texture=TEXTURES[C1_DOWN1]
-            ),
+                tile_id=i, duration=CHUCHU_ANIMATION_SPEED, texture=TEXTURES[t]
+            )
+            for i, t in enumerate((C1_LEFT1, C1_LEFT2, C1_LEFT1, C1_LEFT3))
         ],
     }
 
