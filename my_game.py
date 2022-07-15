@@ -43,6 +43,9 @@ DRAIN_OPEN_TIME = 0.5
 # Annotations will disapear after this many seconds
 ANNOTATION_LIFETIME_SECONDS = 10
 
+# The maximum number of sumultanious annotations for a player
+ANNOTATION_MAX_NO = 3
+
 # Load a textures from a tilemap
 TEXTURES = arcade.load_spritesheet(
     file_name="images/urbanrpg/tilemap.png",
@@ -466,7 +469,7 @@ class Annotation(arcade.Sprite):
     The Annotation is deleted after <lifetime> seconds.
     """
 
-    def __init__(self, direction: Direction, lifetime, **kwargs):
+    def __init__(self, direction: Direction, owner: Player, lifetime, **kwargs):
 
         kwargs["scale"] = TILE_SCALING
 
@@ -474,6 +477,8 @@ class Annotation(arcade.Sprite):
         super().__init__(**kwargs)
         self.direction = direction
         self.texture = TEXTURES[A_UP1]
+        self.owner = owner
+        self.position = owner.position
 
         # Rotate based on direction
         self.angle = -90 * (
@@ -617,20 +622,22 @@ class Level:
         self.players.append(player)
         return self.players.index(player)
 
-    def add_annotation(self, player_no, annotation: Annotation):
+    def add_annotation(self, owner: Player, direction: Direction):
         """
         Add an annotation at the position of the player
         """
-        # Add an Annotation if none exists at player's position
-        if (
-            self.get_sprite_from_screen_coordinates(
-                self.players[player_no].position, self.annotations
-            )
-            is None
-        ):
-            # Add new annotation
-            annotation.position = self.players[player_no].position
-            self.annotations.append(annotation)
+        # Don't place an annotation if player has reached the limit
+        if len([a for a in self.annotations if a.owner == owner]) >= ANNOTATION_MAX_NO:
+            return None
+
+        # Don't place an Annotation if one exists at player's position
+        if self.get_sprite_from_screen_coordinates(owner.position, self.annotations):
+            return None
+
+        # Add new annotation
+        self.annotations.append(
+            Annotation(direction, owner, ANNOTATION_LIFETIME_SECONDS)
+        )
 
     def get_sprite_from_screen_coordinates(self, coordinates, sprite_list):
         """
@@ -906,9 +913,7 @@ class MyGame(arcade.Window):
         elif key == arcade.key.LEFT:
             ad = Direction.LEFT
         if ad:
-            self.tile_matrix.add_annotation(
-                0, Annotation(ad, ANNOTATION_LIFETIME_SECONDS)
-            )
+            self.tile_matrix.add_annotation(self.players[0], ad)
 
     def on_key_release(self, key, modifiers):
         """
