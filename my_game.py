@@ -8,6 +8,7 @@ Artwork from https://kenney.nl/assets/space-shooter-redux
 """
 from enum import Enum
 from os import DirEntry
+from random import randint
 from typing import List, Optional, Union
 import arcade
 
@@ -19,6 +20,7 @@ TILE_SCALING = 4
 TILE_SIZE = TILE_SCALING * 16
 # Time in ms for each keyframe
 CHUCHU_ANIMATION_SPEED = 300
+CHUCHU_NO_OF_TYPES = 5
 
 # When Chuchu is closer to destination than this, it has arrived
 IS_ON_TILE_DIFF = 1.0
@@ -226,35 +228,7 @@ class Chuchu(arcade.AnimatedTimeBasedSprite):
     A Chuchu (AKA a mouse)
     """
 
-    # The textures to use in animation for a ChuChu based on direction
-    frames = {
-        Direction.UP: [
-            arcade.AnimationKeyframe(
-                tile_id=i, duration=CHUCHU_ANIMATION_SPEED, texture=TEXTURES[t]
-            )
-            for i, t in enumerate((C1_UP1, C1_UP2, C1_UP1, C1_UP3))
-        ],
-        Direction.RIGHT: [
-            arcade.AnimationKeyframe(
-                tile_id=i, duration=CHUCHU_ANIMATION_SPEED, texture=TEXTURES[t]
-            )
-            for i, t in enumerate((C1_RIGHT1, C1_RIGHT2, C1_RIGHT1, C1_RIGHT3))
-        ],
-        Direction.DOWN: [
-            arcade.AnimationKeyframe(
-                tile_id=i, duration=CHUCHU_ANIMATION_SPEED, texture=TEXTURES[t]
-            )
-            for i, t in enumerate((C1_DOWN1, C1_DOWN2, C1_DOWN1, C1_DOWN3))
-        ],
-        Direction.LEFT: [
-            arcade.AnimationKeyframe(
-                tile_id=i, duration=CHUCHU_ANIMATION_SPEED, texture=TEXTURES[t]
-            )
-            for i, t in enumerate((C1_LEFT1, C1_LEFT2, C1_LEFT1, C1_LEFT3))
-        ],
-    }
-
-    def __init__(self, my_emitter, my_speed=2, **kwargs):
+    def __init__(self, my_emitter, my_speed=2, type: Optional[int] = None, **kwargs):
         """
         Setup new Chuchu. It always moves towards <my_destination_screen_coordinates>.
         When the destination is reached. I waits for a new direction passed to it with
@@ -262,6 +236,10 @@ class Chuchu(arcade.AnimatedTimeBasedSprite):
         """
         # The direction I'm moving in
         self.my_direction = Direction.NONE
+
+        # Type is random if not specified
+        if type is None:
+            self.type = randint(0, CHUCHU_NO_OF_TYPES)
 
         # Steps per tile
         self.my_speed = my_speed
@@ -316,9 +294,35 @@ class Chuchu(arcade.AnimatedTimeBasedSprite):
             self.my_destination_screen_coordinates[1] - self.center_y
         ) / self.my_speed
 
-        self.frames = Chuchu.frames[self.my_direction]
+        self.frames = self.get_keyframes(
+            self.my_direction
+        )  # Chuchu.frames[self.my_direction]
 
         self.waiting_for_orders = False
+
+    def get_keyframes(self, direction: Direction) -> List[arcade.AnimationKeyframe]:
+
+        type_offset = self.type * (3 * 27)
+
+        match direction:
+            case Direction.UP:
+                texture_nos = (C1_UP1, C1_UP2, C1_UP1, C1_UP3)
+            case Direction.RIGHT:
+                texture_nos = (C1_RIGHT1, C1_RIGHT2, C1_RIGHT1, C1_RIGHT3)
+            case Direction.DOWN:
+                texture_nos = (C1_DOWN1, C1_DOWN2, C1_DOWN1, C1_DOWN3)
+            case Direction.LEFT:
+                texture_nos = (C1_LEFT1, C1_LEFT2, C1_LEFT1, C1_LEFT3)
+
+        texture_nos = [n + type_offset for n in texture_nos]
+
+        # Create Keyframe objects
+        return [
+            arcade.AnimationKeyframe(
+                tile_id=i, duration=CHUCHU_ANIMATION_SPEED, texture=TEXTURES[t]
+            )
+            for i, t in enumerate(texture_nos)
+        ]
 
     def on_update(self, delta_time):
         """
