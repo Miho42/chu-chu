@@ -36,8 +36,10 @@ PLAYER_START_X = SCREEN_WIDTH / 2
 PLAYER_START_Y = 50
 PLAYER_SHOT_SPEED = 4
 
-FIRE_KEY = arcade.key.SPACE
+# Annotations will disapear after this many seconds
+ANNOTATION_LIFETIME_SECONDS = 10
 
+# Load a textures from a tilemap
 TEXTURES = arcade.load_spritesheet(
     file_name="images/urbanrpg/tilemap.png",
     sprite_width=16,
@@ -438,13 +440,34 @@ class Drain(arcade.Sprite):
 
 
 class Annotation(arcade.Sprite):
-    def __init__(self, **kwargs):
-        # kwargs["filename"] = "images/Annotations/Annotation_2.png"
+    """
+    Annotations will guide ChuChus in the direction the Annotation is pointing.
+    The Annotation is deleted after <lifetime> seconds.
+    """
+
+    def __init__(self, direction: Direction, lifetime, **kwargs):
+
         kwargs["scale"] = TILE_SCALING
+
         # Pass arguments to class arcade.Sprite
         super().__init__(**kwargs)
-
+        self.direction = direction
         self.texture = TEXTURES[A_UP1]
+
+        # Rotate based on direction
+        self.angle = -90 * (
+            Direction.UP,
+            Direction.RIGHT,
+            Direction.DOWN,
+            Direction.LEFT,
+        ).index(self.direction)
+
+        self.lifetime = lifetime
+
+    def on_update(self, delta_time):
+        self.lifetime -= delta_time
+        if self.lifetime <= 0:
+            self.kill()
 
 
 class Level:
@@ -564,8 +587,16 @@ class Level:
         """
         Add an annotation at the position of the player
         """
-        annotation.position = self.players[player_no].position
-        self.annotations.append(annotation)
+        # Add an Annotation if none exists at player's position
+        if (
+            self.get_sprite_from_screen_coordinates(
+                self.players[player_no].position, self.annotations
+            )
+            is None
+        ):
+            # Add new annotation
+            annotation.position = self.players[player_no].position
+            self.annotations.append(annotation)
 
     def get_sprite_from_screen_coordinates(self, coordinates, sprite_list):
         """
@@ -592,7 +623,10 @@ class Level:
 
     def on_update(self, delta_time):
 
-        # Pull chuchus from emitters
+        # Remove expired annotations
+        self.annotations.on_update(delta_time)
+
+        # Pull ChuChus from emitters
         for e in self.emitters:
             c = e.get_chuchu()
 
@@ -616,6 +650,12 @@ class Level:
 
                     # Nothing more to do for this Chuchu
                     break
+
+                # Change direction if on an Annotation
+                if current_annotation := self.get_sprite_from_screen_coordinates(
+                    c.position, self.annotations
+                ):
+                    c.move(current_annotation.direction)
 
                 # Get the tile the waiting ChuChu is on
                 current_tile = self.get_sprite_from_screen_coordinates(
@@ -805,23 +845,33 @@ class MyGame(arcade.Window):
         """
 
         # Track state of arrow keys
-        # These directions are in level coordinates,
-        # that is y is opposite of screen coordinatesystem.
-        if key == arcade.key.UP:
+        # Move player 0
+        if key == arcade.key.W:
             self.up_pressed = True
             self.tile_matrix.move_player(0, Direction.UP)
-        elif key == arcade.key.DOWN:
+        elif key == arcade.key.S:
             self.down_pressed = True
             self.tile_matrix.move_player(0, Direction.DOWN)
-        elif key == arcade.key.LEFT:
+        elif key == arcade.key.A:
             self.left_pressed = True
             self.tile_matrix.move_player(0, Direction.LEFT)
-        elif key == arcade.key.RIGHT:
+        elif key == arcade.key.D:
             self.right_pressed = True
             self.tile_matrix.move_player(0, Direction.RIGHT)
 
-        if key == FIRE_KEY:
-            self.tile_matrix.add_annotation(0, Annotation())
+        ad = None
+        if key == arcade.key.UP:
+            ad = Direction.UP
+        elif key == arcade.key.RIGHT:
+            ad = Direction.RIGHT
+        elif key == arcade.key.DOWN:
+            ad = Direction.DOWN
+        elif key == arcade.key.LEFT:
+            ad = Direction.LEFT
+        if ad:
+            self.tile_matrix.add_annotation(
+                0, Annotation(ad, ANNOTATION_LIFETIME_SECONDS)
+            )
 
     def on_key_release(self, key, modifiers):
         """
@@ -839,8 +889,6 @@ class MyGame(arcade.Window):
 
     def on_joybutton_press(self, joystick, button_no):
         print("Button pressed:", button_no)
-        # Press the fire key
-        self.on_key_press(FIRE_KEY, [])
 
     def on_joybutton_release(self, joystick, button_no):
         print("Button released:", button_no)
