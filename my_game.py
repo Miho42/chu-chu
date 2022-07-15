@@ -71,6 +71,10 @@ A_UP1 = 7 * 27 + 1
 # Players
 P_P1 = 9 * 27 + 2
 
+# Walls
+W_H1 = 11 * 27 + 1
+W_V1 = W_H1 + 1
+
 
 class Direction(Enum):
     """
@@ -141,39 +145,31 @@ class Tile(arcade.Sprite):
         0: {"texture_no": T_TILE_NONE},
         1: {
             Direction.UP: Direction.RIGHT,
-            "texture_no": T_TILE_T,
         },
         2: {
             Direction.RIGHT: Direction.DOWN,
-            "texture_no": T_TILE_R,
         },
         3: {
             Direction.DOWN: Direction.LEFT,
-            "texture_no": T_TILE_B,
         },
         4: {
             Direction.LEFT: Direction.UP,
-            "texture_no": T_TILE_L,
         },
         5: {
             Direction.UP: Direction.RIGHT,
             Direction.LEFT: Direction.DOWN,
-            "texture_no": T_TILE_TL,
         },
         6: {
             Direction.RIGHT: Direction.DOWN,
             Direction.UP: Direction.LEFT,
-            "texture_no": T_TILE_TR,
         },
         7: {
             Direction.DOWN: Direction.LEFT,
             Direction.RIGHT: Direction.UP,
-            "texture_no": T_TILE_BR,
         },
         8: {
             Direction.LEFT: Direction.UP,
             Direction.DOWN: Direction.RIGHT,
-            "texture_no": T_TILE_BL,
         },
     }
 
@@ -189,7 +185,7 @@ class Tile(arcade.Sprite):
         # Pass arguments to class arcade.Sprite
         super().__init__(**kwargs)
 
-        self.texture = TEXTURES[Tile.types[self.__type]["texture_no"]]
+        self.texture = TEXTURES[T_TILE_NONE]
 
         self.position = center_x, center_y
 
@@ -198,6 +194,22 @@ class Tile(arcade.Sprite):
         Return the direction to move in if Tile was entered from <direction_in>
         """
         return Tile.types[self.__type].get(direction_in, direction_in)
+
+    def get_walls(self) -> List[arcade.Sprite]:
+        """
+        Get a list of tile's wall Sprites.
+        """
+        walls = []
+        for k in Tile.types[self.__type].keys():
+            if type(k) == Direction:
+                w = arcade.Sprite(scale=SPRITE_SCALING)
+                w.position = [sum(x) for x in zip(k * (TILE_SIZE / 2), self.position)]
+                if k in (Direction.LEFT, Direction.RIGHT):
+                    w.texture = TEXTURES[W_V1]
+                else:
+                    w.texture = TEXTURES[W_H1]
+                walls.append(w)
+        return walls
 
 
 class Chuchu(arcade.Sprite):
@@ -208,7 +220,7 @@ class Chuchu(arcade.Sprite):
     def __init__(self, my_emitter, my_speed=2, **kwargs):
         """
         Setup new Chuchu. It always moves towards <my_destination_screen_coordinates>.
-        When the destination is reached. I waits for a new dircetion passed to it with
+        When the destination is reached. I waits for a new direction passed to it with
         move().
         """
         # The direction I'm moving in
@@ -241,7 +253,7 @@ class Chuchu(arcade.Sprite):
 
     def drained(self):
         """
-        When a Chuchu reaches a drain and should no longer exist
+        When a Chuchu reaches a drain it should no longer exist
         """
         if DEBUG_ON:
             print("I was drained. Yes!")
@@ -298,8 +310,6 @@ class Emitter(arcade.Sprite):
     An emitter spawning chuchus
     """
 
-    emitter_types = {0: "images/Emitter/Emitter_jar.png"}
-
     def __init__(
         self,
         on_tile,
@@ -325,8 +335,6 @@ class Emitter(arcade.Sprite):
 
         # Pass arguments to class arcade.Sprite
         super().__init__(**kwargs)
-
-        # kwargs["filename"] = Emitter.emitter_types[type]
 
         self.texture = TEXTURES[E_E1]
 
@@ -417,6 +425,7 @@ class Level:
         self.drains = arcade.SpriteList()
         self.annotations = arcade.SpriteList()
         self.players = arcade.SpriteList()
+        self.walls = arcade.SpriteList()
 
         self.matrix_width = len(level_data["tiles"][0])
         self.matrix_height = len(level_data["tiles"])
@@ -427,16 +436,19 @@ class Level:
         new_tile_x = matrix_offset_x
         new_tile_y = matrix_offset_y + (self.matrix_height - 1) * tile_size
         for row in level_data["tiles"]:
-            self.tiles.extend(
-                [
-                    Tile(
-                        type=type,
-                        center_x=index * tile_size + new_tile_x,
-                        center_y=new_tile_y,
-                    )
-                    for index, type in enumerate(row)
-                ]
-            )
+            for index, type in enumerate(row):
+                t = Tile(
+                    type=type,
+                    center_x=index * tile_size + new_tile_x,
+                    center_y=new_tile_y,
+                )
+                self.tiles.append(t)
+                # for wp in t.get_walls():
+                #    print(wp)
+                #    w = arcade.Sprite()
+                #    w.texture = TEXTURES[W_V1]
+                #    w.position = wp
+                self.walls.extend(t.get_walls())
             new_tile_y -= tile_size
 
         # Add emitters
@@ -530,6 +542,7 @@ class Level:
 
     def draw(self, pixelated=True):
         self.tiles.draw(pixelated=pixelated)
+        self.walls.draw(pixelated=pixelated)
         self.annotations.draw(pixelated=pixelated)
         self.emitters.draw(pixelated=pixelated)
         self.drains.draw(pixelated=pixelated)
@@ -696,8 +709,8 @@ class MyGame(arcade.Window):
         # No of lives
         self.player_lives = PLAYER_LIVES
 
-        # Start at level 1
-        self.level = 2
+        # Start at this level
+        self.level = 1
 
         self.players = arcade.SpriteList()
         self.players.append(Player())
