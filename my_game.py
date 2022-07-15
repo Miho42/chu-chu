@@ -55,9 +55,22 @@ T_TILE_BL = 2 * 27
 T_TILE_B = 2 * 27 + 1
 
 # Indexes for chuchus
-C1_UP1 = 25
+C1_LEFT1 = 23
+C1_LEFT2 = C1_LEFT1 + 27
+C1_LEFT3 = C1_LEFT2 + 27
+
+C1_DOWN1 = C1_LEFT1 + 1
+C1_DOWN2 = C1_DOWN1 + 27
+C1_DOWN3 = C1_DOWN2 + 27
+
+C1_UP1 = C1_LEFT1 + 2
 C1_UP2 = C1_UP1 + 27
 C1_UP3 = C1_UP2 + 27
+
+C1_RIGHT1 = C1_LEFT1 + 3
+C1_RIGHT2 = C1_RIGHT1 + 27
+C1_RIGHT3 = C1_RIGHT2 + 27
+
 
 # Emitters
 E_E1 = 11 * 27 + 9
@@ -281,6 +294,17 @@ class Chuchu(arcade.Sprite):
         self.change_y = (
             self.my_destination_screen_coordinates[1] - self.center_y
         ) / self.my_speed
+
+        if new_direction == Direction.UP:
+            self.texture = TEXTURES[C1_UP1]
+        elif new_direction == Direction.RIGHT:
+            self.texture = TEXTURES[C1_RIGHT1]
+        elif new_direction == Direction.DOWN:
+            self.texture = TEXTURES[C1_DOWN1]
+        elif new_direction == Direction.LEFT:
+            self.texture = TEXTURES[C1_LEFT1]
+        else:
+            raise ValueError("New direction is no direction")
 
         self.waiting_for_orders = False
 
