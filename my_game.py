@@ -27,7 +27,7 @@ IS_ON_TILE_DIFF = 1.0
 
 # Set the size of the screen
 SCREEN_WIDTH = 800
-SCREEN_HEIGHT = 600
+SCREEN_HEIGHT = 650
 
 # Variables controlling the player
 PLAYER_LIVES = 3
@@ -499,9 +499,10 @@ class Level:
     def __init__(
         self,
         level_data,
-        tile_size=TILE_SIZE,
-        matrix_offset_x=50,
-        matrix_offset_y=50,
+        tile_size: int = TILE_SIZE,
+        matrix_offset_x: int = 50,
+        matrix_offset_y: int = 50,
+        level_time_seconds: int = 30,
     ):
         # Ceate sprite lists
         self.tiles = arcade.SpriteList()
@@ -511,6 +512,8 @@ class Level:
         self.annotations = arcade.SpriteList()
         self.players = arcade.SpriteList()
         self.walls = arcade.SpriteList()
+
+        self.__time_left = level_time_seconds
 
         self.matrix_width = len(level_data["tiles"][0])
         self.matrix_height = len(level_data["tiles"])
@@ -528,11 +531,7 @@ class Level:
                     center_y=new_tile_y,
                 )
                 self.tiles.append(t)
-                # for wp in t.get_walls():
-                #    print(wp)
-                #    w = arcade.Sprite()
-                #    w.texture = TEXTURES[W_V1]
-                #    w.position = wp
+                # Add the walls for the tile
                 self.walls.extend(t.get_walls())
             new_tile_y -= tile_size
 
@@ -551,18 +550,32 @@ class Level:
             self.drains.append(Drain(self.get_tile(d["pos"])))
 
     @property
-    def level_clear(self):
+    def time_left(self) -> float:
         """
-        If all Chuchus are drained, level ends :P
+        Time left in the level
         """
+        return self.__time_left
+
+    @property
+    def level_clear(self) -> bool:
+        """
+        Is the level done/clear
+        """
+
+        # If all Chuchus have been drained
         if sum([d.no_drained for d in self.drains]) is sum(
             [e.capacity for e in self.emitters]
         ):
             return True
-        else:
-            return False
 
-    def get_tile(self, position):
+        # Time has expired
+        if self.__time_left <= 0:
+            return True
+
+        # Level is not clear/done
+        return False
+
+    def get_tile(self, position) -> arcade.Sprite:
         """
         Return tile object on <position> in level list
         """
@@ -688,6 +701,8 @@ class Level:
                 c.move(current_tile.get_out_direction(c.my_direction))
 
             c.on_update(delta_time)
+
+        self.__time_left -= delta_time
 
 
 class MyGame(arcade.Window):
@@ -840,16 +855,16 @@ class MyGame(arcade.Window):
         # This command has to happen before we start drawing
         arcade.start_render()
 
+        # Draw matrix on screen
+        self.tile_matrix.draw()
+
         # Draw players score on screen
         arcade.draw_text(
-            "SCORE: {}".format(self.player_score),  # Text to show
+            "Time left: {}".format(int(self.tile_matrix.time_left)),
             10,  # X position
             SCREEN_HEIGHT - 20,  # Y positon
             arcade.color.WHITE,  # Color of text
         )
-
-        # Draw matrix on screen
-        self.tile_matrix.draw()
 
     def on_update(self, delta_time):
         """
