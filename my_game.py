@@ -46,6 +46,11 @@ ANNOTATION_LIFETIME_SECONDS = 10
 # The maximum number of sumultanious annotations for a player
 ANNOTATION_MAX_NO = 3
 
+BUTTON_UP = 3
+BUTTON_RIGHT = 2
+BUTTON_DOWN = 1
+BUTTON_LEFT = 0
+
 # Load a textures from a tilemap
 TEXTURES = arcade.load_spritesheet(
     file_name="images/urbanrpg/tilemap.png",
@@ -136,7 +141,7 @@ class Player(arcade.Sprite):
         """
         Setup new Player object
         """
-        self._tile_pos = (0, 0)
+        self.__tile_pos = (0, 0)
 
         # How much to scale the graphics
         kwargs["scale"] = SPRITE_SCALING
@@ -144,15 +149,85 @@ class Player(arcade.Sprite):
         # Pass arguments to class arcade.Sprite
         super().__init__(**kwargs)
 
-        self.texture = TEXTURES[P_P1]
+        self.texture: arcade.Texture = TEXTURES[P_P1]
+
+        # The level the Player is currently playing
+        self.level: Level = None
+
+        # The joystick used to control the player
+        self.__joystick = None
+
+    @property
+    def joystick(self):
+        return self.__joystick
+
+    @joystick.setter
+    def joystick(self, joystick):
+        self.__joystick = joystick
+
+        # Map joystick methods to local methods
+        self.__joystick.on_joybutton_press = self.__on_joybutton_press
+        self.__joystick.on_joyaxis_motion = self.__on_joyaxis_motion
+        self.__joystick.on_joyhat_motion = self.__on_joyhat_motion
+
+        # Communicate with joystick
+        self.__joystick.open()
+
+        if DEBUG_ON:
+            print(
+                f"Added joystick to Player: {self.__joystick.device.name} ({self.__joystick.device.manufacturer})"
+            )
+            print(
+                f"Joystick has these controls: {self.__joystick.device.get_controls()}"
+            )
 
     @property
     def tile_pos(self):
-        return self._tile_pos
+        return self.__tile_pos
 
     @tile_pos.setter
     def tile_pos(self, new_pos):
-        self._tile_pos = new_pos
+        self.__tile_pos = new_pos
+
+    def __on_joybutton_press(self, joystick, button_no):
+        if DEBUG_ON:
+            print(f"Button {button_no} pressed in player")
+
+        # Add an annotation to the level being played
+        ad = None
+        if self.level:
+            if button_no == BUTTON_UP:
+                ad = Direction.UP
+            elif button_no == BUTTON_RIGHT:
+                ad = Direction.RIGHT
+            elif button_no == BUTTON_DOWN:
+                ad = Direction.DOWN
+            elif button_no == BUTTON_LEFT:
+                ad = Direction.LEFT
+            if ad:
+                self.level.add_annotation(self, ad)
+
+    def __on_joyaxis_motion(self, joystick, axis, value):
+        """
+        Move the player on joyaxis motion (Integer values)
+        """
+        if DEBUG_ON:
+            print(f"Joystick axis: {axis}, value: {value}")
+
+        # assert value in [-1, 0, 1], f"Value '{value}' from joystick motion must be -1, 0 or 1"
+        if value in [-1, 0, 1]:
+            if axis == "hat_x":
+                d = Direction((int(value), 0))
+            else:
+                d = Direction((0, int(value)))
+            if d:
+                self.level.move_player(self, d)
+        else:
+            print(f"Ignoring invalid joyaxis value '{value}' in Player")
+
+    def __on_joyhat_motion(self, joystick, hat_x, hat_y):
+        if DEBUG_ON:
+            print("Joystick hat ({}, {})".format(hat_x, hat_y))
 
 
 class Tile(arcade.Sprite):
@@ -588,13 +663,17 @@ class Level:
             position[1] * self.matrix_width + position[0] % self.matrix_width
         ]
 
-    def move_player(self, player_no: int, direction: Direction) -> None:
+    def move_player(self, player: Player, direction: Direction) -> None:
         """
         Move a player
         """
-        p = self.players[player_no]
+        assert player in self.players, "Player is not in Level"
+        if DEBUG_ON:
+            print(f"Move player {player} in direction:", direction)
+
         # Current grid position
-        current_pos = p.tile_pos
+        current_pos = player.tile_pos
+
         # New position in grid (Y axis inverted for pos)
         new_pos = (
             current_pos[0] + direction.value[0],
@@ -608,16 +687,17 @@ class Level:
             return None
 
         # Update player position in grid
-        p.tile_pos = new_pos
+        player.tile_pos = new_pos
         # Update player's screen coordinates to
         # match tile on new position
-        p.position = self.get_tile(new_pos).position
+        player.position = self.get_tile(new_pos).position
 
     def add_player(self, player: Player, tile_pos) -> int:
         """
         Add a player to the game
         """
         player.tile_pos = tile_pos
+        player.level = self
         player.position = self.get_tile(tile_pos).position
         self.players.append(player)
         return self.players.index(player)
@@ -797,8 +877,9 @@ class MyGame(arcade.Window):
         self.down_pressed = False
 
         # Get list of joysticks
-        joysticks = arcade.get_joysticks()
+        self.joysticks = arcade.get_joysticks()
 
+        """
         if joysticks:
             print("Found {} joystick(s)".format(len(joysticks)))
 
@@ -807,6 +888,8 @@ class MyGame(arcade.Window):
 
             # Communicate with joystick
             self.joystick.open()
+
+            print(self.joystick.get_controls())
 
             # Map joysticks functions to local functions
             self.joystick.on_joybutton_press = self.on_joybutton_press
@@ -817,8 +900,8 @@ class MyGame(arcade.Window):
         else:
             print("No joysticks found")
             self.joystick = None
+        """
 
-            # self.joystick.
         # Set the background color
         arcade.set_background_color(arcade.color.AMAZON)
 
@@ -835,7 +918,9 @@ class MyGame(arcade.Window):
         self.level = 1
 
         self.players = arcade.SpriteList()
-        self.players.append(Player())
+        p = Player()
+        p.joystick = self.joysticks[0]
+        self.players.append(p)
         self.start_level()
 
     def start_level(self):
@@ -892,16 +977,16 @@ class MyGame(arcade.Window):
         # Move player 0
         if key == arcade.key.W:
             self.up_pressed = True
-            self.tile_matrix.move_player(0, Direction.UP)
+            self.tile_matrix.move_player(self.players[0], Direction.UP)
         elif key == arcade.key.S:
             self.down_pressed = True
-            self.tile_matrix.move_player(0, Direction.DOWN)
+            self.tile_matrix.move_player(self.players[0], Direction.DOWN)
         elif key == arcade.key.A:
             self.left_pressed = True
-            self.tile_matrix.move_player(0, Direction.LEFT)
+            self.tile_matrix.move_player(self.players[0], Direction.LEFT)
         elif key == arcade.key.D:
             self.right_pressed = True
-            self.tile_matrix.move_player(0, Direction.RIGHT)
+            self.tile_matrix.move_player(self.players[0], Direction.RIGHT)
 
         ad = None
         if key == arcade.key.UP:
