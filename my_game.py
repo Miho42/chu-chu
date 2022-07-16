@@ -141,7 +141,6 @@ class Player(arcade.Sprite):
         """
         Setup new Player object
         """
-        self.__tile_pos = (0, 0)
 
         # How much to scale the graphics
         kwargs["scale"] = SPRITE_SCALING
@@ -180,14 +179,6 @@ class Player(arcade.Sprite):
             print(
                 f"Joystick has these controls: {self.__joystick.device.get_controls()}"
             )
-
-    @property
-    def tile_pos(self):
-        return self.__tile_pos
-
-    @tile_pos.setter
-    def tile_pos(self, new_pos):
-        self.__tile_pos = new_pos
 
     def __on_joybutton_press(self, joystick, button_no):
         if DEBUG_ON:
@@ -672,35 +663,24 @@ class Level:
         if DEBUG_ON:
             print(f"Move player {player} in direction:", direction)
 
-        # Current grid position
-        current_pos = player.tile_pos
+        # Calculate new position
+        new_pos = [sum(x) for x in zip(player.position, direction * TILE_SIZE)]
 
-        # New position in grid (Y axis inverted for pos)
-        new_pos = (
-            current_pos[0] + direction.value[0],
-            current_pos[1] + -1 * direction.value[1],
-        )
-
-        # Return if new position is illegal
-        if not -1 < new_pos[0] < self.matrix_width:
-            return None
-        if not -1 < new_pos[1] < self.matrix_height:
-            return None
-
-        # Update player position in grid
-        player.tile_pos = new_pos
-        # Update player's screen coordinates to
-        # match tile on new position
-        player.position = self.get_tile(new_pos).position
+        # Move to new screen position, if it has a tile.
+        if self.get_sprite_from_screen_coordinates(new_pos, self.tiles):
+            player.position = new_pos
 
     def add_player(self, player: Player, tile_pos) -> int:
         """
         Add a player to the game
         """
-        player.tile_pos = tile_pos
+        # Let Player know, the game they are in (So they can move)
         player.level = self
-        player.position = self.get_tile(tile_pos).position
+        # Add the Player to the game
         self.players.append(player)
+        # Player's position is same as Emitter with same index as Player
+        player.position = self.drains[self.players.index(player)].position
+
         return self.players.index(player)
 
     def add_annotation(self, owner: Player, direction: Direction):
