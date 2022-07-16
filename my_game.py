@@ -223,7 +223,8 @@ class Player(arcade.Sprite):
             if d:
                 self.level.move_player(self, d)
         else:
-            print(f"Ignoring invalid joyaxis value '{value}' in Player")
+            if DEBUG_ON:
+                print(f"Ignoring invalid joyaxis value '{value}' in Player")
 
     def __on_joyhat_motion(self, joystick, hat_x, hat_y):
         if DEBUG_ON:
@@ -582,7 +583,7 @@ class Level:
         tile_size: int = TILE_SIZE,
         matrix_offset_x: int = 50,
         matrix_offset_y: int = 50,
-        level_time_seconds: int = 30,
+        level_time_seconds: int = 60,
     ):
         # Ceate sprite lists
         self.tiles = arcade.SpriteList()
@@ -706,13 +707,14 @@ class Level:
         """
         Add an annotation at the position of the player
         """
-        # Don't place an annotation if player has reached the limit
-        if len([a for a in self.annotations if a.owner == owner]) >= ANNOTATION_MAX_NO:
-            return None
-
         # Don't place an Annotation if one exists at player's position
         if self.get_sprite_from_screen_coordinates(owner.position, self.annotations):
             return None
+
+        # If player has reached the limit, remove oldest Annotation
+        a = [a for a in self.annotations if a.owner == owner]
+        if len(a) >= ANNOTATION_MAX_NO:
+            self.annotations[self.annotations.index(a[0])].kill()
 
         # Add new annotation
         self.annotations.append(
