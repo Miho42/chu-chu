@@ -919,7 +919,10 @@ class MyGame(arcade.Window):
 
         self.players = arcade.SpriteList()
         p = Player()
-        p.joystick = self.joysticks[0]
+        try:
+            p.joystick = self.joysticks[0]
+        except IndexError:
+            print("No joystick to add to Player.")
         self.players.append(p)
         self.start_level()
 
