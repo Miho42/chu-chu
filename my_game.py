@@ -6,9 +6,8 @@ This program uses the Arcade library found at http://arcade.academy
 Artwork from https://kenney.nl/assets/space-shooter-redux
 
 """
-from enum import Enum
-from os import DirEntry
-from random import randint
+from enum import Enum, unique, auto
+from random import choice, randint
 from typing import List, Optional, Union
 import arcade
 
@@ -22,8 +21,11 @@ TILE_SIZE = TILE_SCALING * 16
 CHUCHU_ANIMATION_SPEED = 300
 CHUCHU_NO_OF_TYPES = 5
 
+# Time in seconds between events in a level
+LEVEL_TIME_BETWEEN_EVENTS = 5
+
 # When Chuchu is closer to destination than this, it has arrived
-IS_ON_TILE_DIFF = 1.0
+IS_ON_TILE_DIFF = 2.0
 
 # Set the size of the screen
 SCREEN_WIDTH = 800
@@ -111,6 +113,7 @@ W_H1 = 11 * 27 + 1
 W_V1 = W_H1 + 1
 
 
+@unique
 class Direction(Enum):
     """
     Directions in the game matrix.
@@ -133,6 +136,17 @@ class Direction(Enum):
         Multiply all values in Direction
         """
         return [other * v for v in self.value]
+
+
+@unique
+class Event(Enum):
+    """
+    Events in game
+    """
+
+    NORMAL = auto()
+    SPEED_UP = auto()
+    SLOW_DOWN = auto()
 
 
 class Player(arcade.Sprite):
@@ -593,6 +607,15 @@ class Level:
         self.walls = arcade.SpriteList()
 
         self.__time_left = level_time_seconds
+        self.__time_to_next_event = LEVEL_TIME_BETWEEN_EVENTS
+
+        # Currents level's events
+        self.event_queue = []
+
+        # Calculate no. of sets of events and normal in the game
+        for e in range(int((level_time_seconds / self.__time_to_next_event) / 2)):
+            # Add events seperated by normal events to the game
+            self.event_queue.extend([choice(list(Event)[1:]), Event.NORMAL])
 
         self.matrix_width = len(level_data["tiles"][0])
         self.matrix_height = len(level_data["tiles"])
@@ -656,6 +679,24 @@ class Level:
 
         # Level is not clear/done
         return False
+
+    def event(self):
+        """
+        An event happens
+        """
+        if any(self.event_queue):
+            event = self.event_queue.pop(0)
+        else:
+            event = Event.NORMAL
+
+        print(event)
+        if event == Event.SPEED_UP:
+            self.speed_factor = 4.0
+        elif event == Event.SLOW_DOWN:
+            self.speed_factor = 0.25
+        elif event == Event.NORMAL:
+            self.speed_factor = 1.0
+        self.__time_to_next_event = LEVEL_TIME_BETWEEN_EVENTS
 
     def get_tile(self, position) -> arcade.Sprite:
         """
@@ -735,11 +776,16 @@ class Level:
         self.players.draw(pixelated=pixelated)
 
     def on_update(self, delta_time):
-        delta_time *= self.speed_factor
+        self.__time_to_next_event -= delta_time
+        self.__time_left -= delta_time
+        if self.__time_to_next_event <= 0:
+            self.event()
+
+        modified_delta_time = delta_time * self.speed_factor
 
         # Remove expired annotations
-        self.annotations.on_update(delta_time)
-        self.drains.on_update(delta_time)
+        self.annotations.on_update(modified_delta_time)
+        self.drains.on_update(modified_delta_time)
 
         # Pull ChuChus from emitters
         for e in self.emitters:
@@ -749,7 +795,7 @@ class Level:
                 self.chuchus.append(c)
 
             # Update emitter
-            e.on_update(delta_time)
+            e.on_update(modified_delta_time)
 
         # Handle waiting Chuchus
         for c in self.chuchus:
@@ -780,9 +826,7 @@ class Level:
                 # Potentially change direction
                 c.move(current_tile.get_out_direction(c.my_direction))
 
-            c.on_update(delta_time)
-
-        self.__time_left -= delta_time
+            c.on_update(modified_delta_time)
 
 
 class MyGame(arcade.Window):
