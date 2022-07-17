@@ -727,7 +727,7 @@ class Level:
         Add an annotation at the position of the player
         """
         # Don't place an Annotation if one exists at player's position
-        if self.get_sprite_from_screen_coordinates(owner.position, self.annotations):
+        if arcade.get_sprites_at_point(owner.position, self.annotations):
             return None
 
         # Add new annotation to position of Tile Player center is within
@@ -740,20 +740,6 @@ class Level:
             self.annotations.append(
                 Annotation(direction, owner, t[0], ANNOTATION_LIFETIME_SECONDS)
             )
-
-    def get_sprite_from_screen_coordinates(self, coordinates, sprite_list):
-        """
-        Returns a sprite from <sprite_list> matching screen <coordinates>
-        """
-        for t in sprite_list:
-            if (
-                arcade.get_distance(
-                    t.position[0], t.position[1], coordinates[0], coordinates[1]
-                )
-                < IS_ON_TILE_DIFF
-            ):
-                return t
-        return None
 
     def draw(self, pixelated=True):
         self.tiles.draw(pixelated=pixelated)
@@ -795,29 +781,27 @@ class Level:
             if c.waiting_for_orders is True:
 
                 # Is Chuchu on a drain
-                if current_drain := self.get_sprite_from_screen_coordinates(
+                if current_drain := arcade.get_sprites_at_point(
                     c.position, self.drains
                 ):
                     if c.type == CHUCHU_EVENT_TRIGGER_TYPE:
                         # A random, non NORMAL Event occurs
                         self.event(choice(list(Event)[1:]))
 
-                    current_drain.drained(c)
+                    current_drain[0].drained(c)
                     c.kill()
 
                     # Nothing more to do for this Chuchu
                     break
 
                 # Change direction if on an Annotation
-                if current_annotation := self.get_sprite_from_screen_coordinates(
+                if current_annotation := arcade.get_sprites_at_point(
                     c.position, self.annotations
                 ):
-                    c.move(current_annotation.direction)
+                    c.move(current_annotation[0].direction)
 
                 # Get the tile the waiting ChuChu is on
-                current_tile = self.get_sprite_from_screen_coordinates(
-                    c.position, self.tiles
-                )
+                current_tile = arcade.get_sprites_at_point(c.position, self.tiles)[0]
                 assert current_tile is not None, "Chuchu was not on any tile"
                 # Potentially change direction
                 c.move(current_tile.get_out_direction(c.my_direction))
