@@ -382,16 +382,17 @@ class Chuchu(arcade.AnimatedTimeBasedSprite):
 
     def get_keyframes(self, direction: Direction) -> List[arcade.AnimationKeyframe]:
 
-        type_offset = self.type * (3 * 27)
-
-        if Direction.UP:
+        if direction == Direction.UP:
             texture_nos = (C1_UP1, C1_UP2, C1_UP1, C1_UP3)
-        elif Direction.RIGHT:
+        elif direction == Direction.RIGHT:
             texture_nos = (C1_RIGHT1, C1_RIGHT2, C1_RIGHT1, C1_RIGHT3)
-        elif Direction.DOWN:
+        elif direction == Direction.DOWN:
             texture_nos = (C1_DOWN1, C1_DOWN2, C1_DOWN1, C1_DOWN3)
-        elif Direction.LEFT:
+        else:
             texture_nos = (C1_LEFT1, C1_LEFT2, C1_LEFT1, C1_LEFT3)
+
+        # How many rows to skip in spritesheet
+        type_offset = self.type * (3 * 27)
 
         texture_nos = [n + type_offset for n in texture_nos]
 
