@@ -8,6 +8,7 @@ Artwork from https://kenney.nl/assets/space-shooter-redux
 """
 from enum import Enum
 from os import DirEntry
+from random import randint
 from typing import List, Optional, Union
 import arcade
 
@@ -17,13 +18,16 @@ DEBUG_ON = not True
 SPRITE_SCALING = 4
 TILE_SCALING = 4
 TILE_SIZE = TILE_SCALING * 16
+# Time in ms for each keyframe
+CHUCHU_ANIMATION_SPEED = 300
+CHUCHU_NO_OF_TYPES = 5
 
 # When Chuchu is closer to destination than this, it has arrived
 IS_ON_TILE_DIFF = 1.0
 
 # Set the size of the screen
 SCREEN_WIDTH = 800
-SCREEN_HEIGHT = 600
+SCREEN_HEIGHT = 650
 
 # Variables controlling the player
 PLAYER_LIVES = 3
@@ -32,8 +36,25 @@ PLAYER_START_X = SCREEN_WIDTH / 2
 PLAYER_START_Y = 50
 PLAYER_SHOT_SPEED = 4
 
-FIRE_KEY = arcade.key.SPACE
+# Number of seconds to show alternative texture
+# for drains when a ChuChu has been drained
+DRAIN_OPEN_TIME = 0.5
 
+# Annotations will disapear after this many seconds
+ANNOTATION_LIFETIME_SECONDS = 10
+
+# The minimal alpha value to use with fading annotations.
+ANNOTATION_MIN_ALPHA = 0
+
+# The maximum number of sumultanious annotations for a player
+ANNOTATION_MAX_NO = 3
+
+BUTTON_UP = 3
+BUTTON_RIGHT = 2
+BUTTON_DOWN = 1
+BUTTON_LEFT = 0
+
+# Load a textures from a tilemap
 TEXTURES = arcade.load_spritesheet(
     file_name="images/urbanrpg/tilemap.png",
     sprite_width=16,
@@ -55,21 +76,39 @@ T_TILE_BL = 2 * 27
 T_TILE_B = 2 * 27 + 1
 
 # Indexes for chuchus
-C1_UP1 = 25
+C1_LEFT1 = 23
+C1_LEFT2 = C1_LEFT1 + 27
+C1_LEFT3 = C1_LEFT2 + 27
+
+C1_DOWN1 = C1_LEFT1 + 1
+C1_DOWN2 = C1_DOWN1 + 27
+C1_DOWN3 = C1_DOWN2 + 27
+
+C1_UP1 = C1_LEFT1 + 2
 C1_UP2 = C1_UP1 + 27
 C1_UP3 = C1_UP2 + 27
+
+C1_RIGHT1 = C1_LEFT1 + 3
+C1_RIGHT2 = C1_RIGHT1 + 27
+C1_RIGHT3 = C1_RIGHT2 + 27
+
 
 # Emitters
 E_E1 = 11 * 27 + 9
 
 # Drains
-D_D1 = 11 * 27 + 13
+D1_CLOSED = 10 * 27 + 13
+D1_OPEN = D1_CLOSED + 27
 
 # Annotations
 A_UP1 = 7 * 27 + 1
 
 # Players
 P_P1 = 9 * 27 + 2
+
+# Walls
+W_H1 = 11 * 27 + 1
+W_V1 = W_H1 + 1
 
 
 class Direction(Enum):
@@ -105,7 +144,6 @@ class Player(arcade.Sprite):
         """
         Setup new Player object
         """
-        self._tile_pos = (0, 0)
 
         # How much to scale the graphics
         kwargs["scale"] = SPRITE_SCALING
@@ -113,27 +151,78 @@ class Player(arcade.Sprite):
         # Pass arguments to class arcade.Sprite
         super().__init__(**kwargs)
 
-        self.texture = TEXTURES[P_P1]
+        self.texture: arcade.Texture = TEXTURES[P_P1]
+
+        # The level the Player is currently playing
+        self.level: Level = None
+
+        # The joystick used to control the player
+        self.__joystick = None
 
     @property
-    def tile_pos(self):
-        return self._tile_pos
+    def joystick(self):
+        return self.__joystick
 
-    @tile_pos.setter
-    def tile_pos(self, new_pos):
-        self._tile_pos = new_pos
+    @joystick.setter
+    def joystick(self, joystick):
+        self.__joystick = joystick
 
-    def update(self, delta_time):
+        # Map joystick methods to local methods
+        self.__joystick.on_joybutton_press = self.__on_joybutton_press
+        self.__joystick.on_joyaxis_motion = self.__on_joyaxis_motion
+        self.__joystick.on_joyhat_motion = self.__on_joyhat_motion
+
+        # Communicate with joystick
+        self.__joystick.open()
+
+        if DEBUG_ON:
+            print(
+                f"Added joystick to Player: {self.__joystick.device.name} ({self.__joystick.device.manufacturer})"
+            )
+            print(
+                f"Joystick has these controls: {self.__joystick.device.get_controls()}"
+            )
+
+    def __on_joybutton_press(self, joystick, button_no):
+        if DEBUG_ON:
+            print(f"Button {button_no} pressed in player")
+
+        # Add an annotation to the level being played
+        ad = None
+        if self.level:
+            if button_no == BUTTON_UP:
+                ad = Direction.UP
+            elif button_no == BUTTON_RIGHT:
+                ad = Direction.RIGHT
+            elif button_no == BUTTON_DOWN:
+                ad = Direction.DOWN
+            elif button_no == BUTTON_LEFT:
+                ad = Direction.LEFT
+            if ad:
+                self.level.add_annotation(self, ad)
+
+    def __on_joyaxis_motion(self, joystick, axis, value):
         """
-        Move the sprite
+        Move the player on joyaxis motion (Integer values)
         """
-        pass
+        if DEBUG_ON:
+            print(f"Joystick axis: {axis}, value: {value}")
 
+        # assert value in [-1, 0, 1], f"Value '{value}' from joystick motion must be -1, 0 or 1"
+        if value in [-1, 0, 1]:
+            if axis == "hat_x":
+                d = Direction((int(value), 0))
+            else:
+                d = Direction((0, int(value)))
+            if d:
+                self.level.move_player(self, d)
+        else:
+            if DEBUG_ON:
+                print(f"Ignoring invalid joyaxis value '{value}' in Player")
 
-class TileType(Enum):
-    """
-    Tiles with wall. Prefix T mean tile. next character is wall on x-axis, last character is wall on y-axis.
-    """
+    def __on_joyhat_motion(self, joystick, hat_x, hat_y):
+        if DEBUG_ON:
+            print("Joystick hat ({}, {})".format(hat_x, hat_y))
 
 
 class Tile(arcade.Sprite):
@@ -141,47 +230,37 @@ class Tile(arcade.Sprite):
     A tile :)
     """
 
+    # The value of Direction keys, are the Directions a ChuChu should move
+    # after having entered the tile from the key Direction
     types = {
-        0: {"out_dir": Direction.NONE, "block_dirs": [], "texture_no": T_TILE_NONE},
+        0: {"texture_no": T_TILE_NONE},
         1: {
-            "out_dir": Direction.RIGHT,
-            "block_dirs": [Direction.UP],
-            "texture_no": T_TILE_T,
+            Direction.UP: Direction.RIGHT,
         },
         2: {
-            "out_dir": Direction.DOWN,
-            "block_dirs": [Direction.RIGHT],
-            "texture_no": T_TILE_R,
+            Direction.RIGHT: Direction.DOWN,
         },
         3: {
-            "out_dir": Direction.LEFT,
-            "block_dirs": [Direction.DOWN],
-            "texture_no": T_TILE_B,
+            Direction.DOWN: Direction.LEFT,
         },
         4: {
-            "out_dir": Direction.UP,
-            "block_dirs": [Direction.LEFT],
-            "texture_no": T_TILE_L,
+            Direction.LEFT: Direction.UP,
         },
         5: {
-            "out_dir": Direction.RIGHT,
-            "block_dirs": [Direction.UP, Direction.LEFT],
-            "texture_no": T_TILE_TL,
+            Direction.UP: Direction.RIGHT,
+            Direction.LEFT: Direction.DOWN,
         },
         6: {
-            "out_dir": Direction.DOWN,
-            "block_dirs": [Direction.UP, Direction.RIGHT],
-            "texture_no": T_TILE_TR,
+            Direction.RIGHT: Direction.DOWN,
+            Direction.UP: Direction.LEFT,
         },
         7: {
-            "out_dir": Direction.LEFT,
-            "block_dirs": [Direction.RIGHT, Direction.DOWN],
-            "texture_no": T_TILE_BR,
+            Direction.DOWN: Direction.LEFT,
+            Direction.RIGHT: Direction.UP,
         },
         8: {
-            "out_dir": Direction.UP,
-            "block_dirs": [Direction.LEFT, Direction.DOWN],
-            "texture_no": T_TILE_BL,
+            Direction.LEFT: Direction.UP,
+            Direction.DOWN: Direction.RIGHT,
         },
     }
 
@@ -189,7 +268,7 @@ class Tile(arcade.Sprite):
         """
         Setup new Tile object
         """
-        self.my_type = Tile.types[type]
+        self.__type = type
 
         # How much to scale the graphics
         kwargs["scale"] = TILE_SCALING
@@ -197,24 +276,50 @@ class Tile(arcade.Sprite):
         # Pass arguments to class arcade.Sprite
         super().__init__(**kwargs)
 
-        self.texture = TEXTURES[self.my_type["texture_no"]]
+        self.texture = TEXTURES[T_TILE_NONE]
 
         self.position = center_x, center_y
 
+    def get_out_direction(self, direction_in: Direction) -> Direction:
+        """
+        Return the direction to move in if Tile was entered from <direction_in>
+        """
+        return Tile.types[self.__type].get(direction_in, direction_in)
 
-class Chuchu(arcade.Sprite):
+    def get_walls(self) -> List[arcade.Sprite]:
+        """
+        Get a list of tile's wall Sprites.
+        """
+        walls = []
+        for k in Tile.types[self.__type].keys():
+            if type(k) == Direction:
+                w = arcade.Sprite(scale=SPRITE_SCALING)
+                w.position = [sum(x) for x in zip(k * (TILE_SIZE / 2), self.position)]
+                if k in (Direction.LEFT, Direction.RIGHT):
+                    w.texture = TEXTURES[W_V1]
+                else:
+                    w.texture = TEXTURES[W_H1]
+                walls.append(w)
+        return walls
+
+
+class Chuchu(arcade.AnimatedTimeBasedSprite):
     """
     A Chuchu (AKA a mouse)
     """
 
-    def __init__(self, my_emitter, my_speed=2, **kwargs):
+    def __init__(self, my_emitter, my_speed=2, type: Optional[int] = None, **kwargs):
         """
         Setup new Chuchu. It always moves towards <my_destination_screen_coordinates>.
-        When the destination is reached. I waits for a new dircetion passed to it with
+        When the destination is reached. I waits for a new direction passed to it with
         move().
         """
         # The direction I'm moving in
         self.my_direction = Direction.NONE
+
+        # Type is random if not specified
+        if type is None:
+            self.type = randint(0, CHUCHU_NO_OF_TYPES)
 
         # Steps per tile
         self.my_speed = my_speed
@@ -224,9 +329,6 @@ class Chuchu(arcade.Sprite):
 
         # Pass arguments to class arcade.Sprite
         super().__init__(**kwargs)
-
-        # Graphics
-        self.texture = TEXTURES[C1_UP2]
 
         # The screen coordinates I'm moving towards
         self.my_destination_screen_coordinates = self.center_x, self.center_y
@@ -243,7 +345,7 @@ class Chuchu(arcade.Sprite):
 
     def drained(self):
         """
-        When a Chuchu reaches a drain and should no longer exist
+        When a Chuchu reaches a drain it should no longer exist
         """
         if DEBUG_ON:
             print("I was drained. Yes!")
@@ -272,12 +374,41 @@ class Chuchu(arcade.Sprite):
             self.my_destination_screen_coordinates[1] - self.center_y
         ) / self.my_speed
 
+        self.frames = self.get_keyframes(
+            self.my_direction
+        )  # Chuchu.frames[self.my_direction]
+
         self.waiting_for_orders = False
 
-    def update(self, delta_time):
+    def get_keyframes(self, direction: Direction) -> List[arcade.AnimationKeyframe]:
+
+        type_offset = self.type * (3 * 27)
+
+        match direction:
+            case Direction.UP:
+                texture_nos = (C1_UP1, C1_UP2, C1_UP1, C1_UP3)
+            case Direction.RIGHT:
+                texture_nos = (C1_RIGHT1, C1_RIGHT2, C1_RIGHT1, C1_RIGHT3)
+            case Direction.DOWN:
+                texture_nos = (C1_DOWN1, C1_DOWN2, C1_DOWN1, C1_DOWN3)
+            case Direction.LEFT:
+                texture_nos = (C1_LEFT1, C1_LEFT2, C1_LEFT1, C1_LEFT3)
+
+        texture_nos = [n + type_offset for n in texture_nos]
+
+        # Create Keyframe objects
+        return [
+            arcade.AnimationKeyframe(
+                tile_id=i, duration=CHUCHU_ANIMATION_SPEED, texture=TEXTURES[t]
+            )
+            for i, t in enumerate(texture_nos)
+        ]
+
+    def on_update(self, delta_time):
         """
         Move chuchu towards destination coordinates if not there yet.
         """
+        self.update_animation(delta_time)
         if (
             arcade.get_distance(
                 self.my_destination_screen_coordinates[0],
@@ -299,8 +430,6 @@ class Emitter(arcade.Sprite):
     """
     An emitter spawning chuchus
     """
-
-    emitter_types = {0: "images/Emitter/Emitter_jar.png"}
 
     def __init__(
         self,
@@ -327,8 +456,6 @@ class Emitter(arcade.Sprite):
 
         # Pass arguments to class arcade.Sprite
         super().__init__(**kwargs)
-
-        # kwargs["filename"] = Emitter.emitter_types[type]
 
         self.texture = TEXTURES[E_E1]
 
@@ -358,7 +485,7 @@ class Emitter(arcade.Sprite):
                 print(f"Number of Chuchus emitted: {self.no_emitted}")
             return c
 
-    def update(self, delta_time):
+    def on_update(self, delta_time):
         if self.emit_timer > 0:
             self.emit_timer -= delta_time
 
@@ -375,43 +502,84 @@ class Drain(arcade.Sprite):
         # Pass arguments to class arcade.Sprite
         super().__init__(**kwargs)
 
-        self.texture = TEXTURES[D_D1]
+        # self.texture = TEXTURES[D1_CLOSED]
         self.position = on_tile.position
 
         # Number of Chuchus drained
         self.no_drained = 0
+
+        # How long to show alternative texture when darining a ChuChu
+        self.open_time_seconds = 0
+
+        self.frames = [TEXTURES[D1_CLOSED], TEXTURES[D1_OPEN]]
+        self.texture = self.frames[0]
 
     def drained(self, chuchu):
         """
         <chuchu> has been drained by me
         """
         self.no_drained += 1
+        self.texture = self.frames[1]
+        self.open_time_seconds = DRAIN_OPEN_TIME
         if DEBUG_ON:
             print(f"I have drained a total number of {self.no_drained} chuchus :D")
 
+    def on_update(self, delta_time):
+
+        if self.open_time_seconds > 0:
+            self.open_time_seconds -= delta_time
+        elif self.open_time_seconds < 0:
+            self.texture = self.frames[0]
+            self.open_time_seconds = 0
+
 
 class Annotation(arcade.Sprite):
-    def __init__(self, **kwargs):
-        # kwargs["filename"] = "images/Annotations/Annotation_2.png"
+    """
+    Annotations will guide ChuChus in the direction the Annotation is pointing.
+    The Annotation is deleted after <lifetime> seconds.
+    """
+
+    def __init__(self, direction: Direction, owner: Player, lifetime, **kwargs):
+
         kwargs["scale"] = TILE_SCALING
+
         # Pass arguments to class arcade.Sprite
         super().__init__(**kwargs)
-
+        self.direction = direction
         self.texture = TEXTURES[A_UP1]
+        self.owner = owner
+        self.position = owner.position
+
+        # Rotate based on direction
+        self.angle = -90 * (
+            Direction.UP,
+            Direction.RIGHT,
+            Direction.DOWN,
+            Direction.LEFT,
+        ).index(self.direction)
+
+        self.max_lifetime = lifetime
+        self.lifetime = lifetime
+
+    def on_update(self, delta_time):
+        if self.lifetime <= 0:
+            self.kill()
+        self.alpha = max(255 * self.lifetime / self.max_lifetime, ANNOTATION_MIN_ALPHA)
+        self.lifetime -= delta_time
 
 
-class TileMatrix:
+class Level:
     """
-    Matrix of Tile(s) >:)
-    Consists of chuchus
+    An instantiated level in the game
     """
 
     def __init__(
         self,
         level_data,
-        tile_size=TILE_SIZE,
-        matrix_offset_x=50,
-        matrix_offset_y=50,
+        tile_size: int = TILE_SIZE,
+        matrix_offset_x: int = 50,
+        matrix_offset_y: int = 50,
+        level_time_seconds: int = 60,
     ):
         # Ceate sprite lists
         self.tiles = arcade.SpriteList()
@@ -420,6 +588,9 @@ class TileMatrix:
         self.drains = arcade.SpriteList()
         self.annotations = arcade.SpriteList()
         self.players = arcade.SpriteList()
+        self.walls = arcade.SpriteList()
+
+        self.__time_left = level_time_seconds
 
         self.matrix_width = len(level_data["tiles"][0])
         self.matrix_height = len(level_data["tiles"])
@@ -430,23 +601,20 @@ class TileMatrix:
         new_tile_x = matrix_offset_x
         new_tile_y = matrix_offset_y + (self.matrix_height - 1) * tile_size
         for row in level_data["tiles"]:
-            self.tiles.extend(
-                [
-                    Tile(
-                        type=type,
-                        center_x=index * tile_size + new_tile_x,
-                        center_y=new_tile_y,
-                    )
-                    for index, type in enumerate(row)
-                ]
-            )
+            for index, type in enumerate(row):
+                t = Tile(
+                    type=type,
+                    center_x=index * tile_size + new_tile_x,
+                    center_y=new_tile_y,
+                )
+                self.tiles.append(t)
+                # Add the walls for the tile
+                self.walls.extend(t.get_walls())
             new_tile_y -= tile_size
-
-        # self.tiles[0].texture = TileMatrix.textures[0]
 
         # Add emitters
         for e in level_data["emitters"]:
-            self.add_emitter(
+            self.emitters.append(
                 Emitter(
                     self.get_tile(e["pos"]),
                     type=e["image"],
@@ -456,80 +624,87 @@ class TileMatrix:
 
         # Add drains
         for d in level_data["drains"]:
-            self.add_drain(Drain(self.get_tile(d["pos"])))
+            self.drains.append(Drain(self.get_tile(d["pos"])))
 
     @property
-    def level_clear(self):
+    def time_left(self) -> float:
         """
-        If all Chuchus are drained, level ends :P
+        Time left in the level
         """
+        return self.__time_left
+
+    @property
+    def level_clear(self) -> bool:
+        """
+        Is the level done/clear
+        """
+
+        # If all Chuchus have been drained
         if sum([d.no_drained for d in self.drains]) is sum(
             [e.capacity for e in self.emitters]
         ):
             return True
-        else:
-            return False
 
-    def get_tile(self, position):
+        # Time has expired
+        if self.__time_left <= 0:
+            return True
+
+        # Level is not clear/done
+        return False
+
+    def get_tile(self, position) -> arcade.Sprite:
         """
-        Return tile object on <position> in matrix
+        Return tile object on <position> in level list
         """
         return self.tiles[
             position[1] * self.matrix_width + position[0] % self.matrix_width
         ]
 
-    def move_player(self, player_no: int, direction: Direction) -> None:
+    def move_player(self, player: Player, direction: Direction) -> None:
         """
-        The player is moved
+        Move a player
         """
-        p = self.players[player_no]
-        # Current grid position
-        current_pos = p.tile_pos
-        # New position in grid (Y axis inverted for pos)
-        new_pos = (
-            current_pos[0] + direction.value[0],
-            current_pos[1] + -1 * direction.value[1],
-        )
+        assert player in self.players, "Player is not in Level"
+        if DEBUG_ON:
+            print(f"Move player {player} in direction:", direction)
 
-        # Return if new position is illegal
-        if not -1 < new_pos[0] < self.matrix_width:
-            return None
-        if not -1 < new_pos[1] < self.matrix_height:
-            return None
+        # Calculate new position
+        new_pos = [sum(x) for x in zip(player.position, direction * TILE_SIZE)]
 
-        # Update player position in grid
-        p.tile_pos = new_pos
-        # Update player's screen coordinates to
-        # match tile on new position
-        p.position = self.get_tile(new_pos).position
+        # Move to new screen position, if it has a tile.
+        if self.get_sprite_from_screen_coordinates(new_pos, self.tiles):
+            player.position = new_pos
 
     def add_player(self, player: Player, tile_pos) -> int:
         """
         Add a player to the game
         """
-        player.tile_pos = tile_pos
-        player.position = self.get_tile(tile_pos).position
+        # Let Player know, the game they are in (So they can move)
+        player.level = self
+        # Add the Player to the game
         self.players.append(player)
+        # Player's position is same as Emitter with same index as Player
+        player.position = self.drains[self.players.index(player)].position
+
         return self.players.index(player)
 
-    def add_annotation(self, player_no, annotation: Annotation):
+    def add_annotation(self, owner: Player, direction: Direction):
         """
         Add an annotation at the position of the player
         """
-        annotation.position = self.players[player_no].position
-        self.annotations.append(annotation)
+        # Don't place an Annotation if one exists at player's position
+        if self.get_sprite_from_screen_coordinates(owner.position, self.annotations):
+            return None
 
-    def add_emitter(self, emitter: arcade.Sprite):
-        """
-        Append emitter to list of emitters
-        """
-        self.emitters.append(emitter)
+        # If player has reached the limit, remove oldest Annotation
+        a = [a for a in self.annotations if a.owner == owner]
+        if len(a) >= ANNOTATION_MAX_NO:
+            self.annotations[self.annotations.index(a[0])].kill()
 
-    def add_drain(self, drain: arcade.Sprite):
-        """
-        Append drain to list of drains
-        """
-        self.drains.append(drain)
+        # Add new annotation
+        self.annotations.append(
+            Annotation(direction, owner, ANNOTATION_LIFETIME_SECONDS)
+        )
 
     def get_sprite_from_screen_coordinates(self, coordinates, sprite_list):
         """
@@ -547,15 +722,20 @@ class TileMatrix:
 
     def draw(self, pixelated=True):
         self.tiles.draw(pixelated=pixelated)
+        self.walls.draw(pixelated=pixelated)
         self.annotations.draw(pixelated=pixelated)
         self.emitters.draw(pixelated=pixelated)
         self.drains.draw(pixelated=pixelated)
         self.chuchus.draw(pixelated=pixelated)
         self.players.draw(pixelated=pixelated)
 
-    def update(self, delta_time):
+    def on_update(self, delta_time):
 
-        # Pull chuchus from emitters
+        # Remove expired annotations
+        self.annotations.on_update(delta_time)
+        self.drains.on_update(delta_time)
+
+        # Pull ChuChus from emitters
         for e in self.emitters:
             c = e.get_chuchu()
 
@@ -563,7 +743,7 @@ class TileMatrix:
                 self.chuchus.append(c)
 
             # Update emitter
-            e.update(delta_time)
+            e.on_update(delta_time)
 
         # Handle waiting Chuchus
         for c in self.chuchus:
@@ -580,24 +760,23 @@ class TileMatrix:
                     # Nothing more to do for this Chuchu
                     break
 
-                # Look at tiles
+                # Change direction if on an Annotation
+                if current_annotation := self.get_sprite_from_screen_coordinates(
+                    c.position, self.annotations
+                ):
+                    c.move(current_annotation.direction)
+
+                # Get the tile the waiting ChuChu is on
                 current_tile = self.get_sprite_from_screen_coordinates(
                     c.position, self.tiles
                 )
                 assert current_tile is not None, "Chuchu was not on any tile"
-                # Assume Chuchu is moving on
-                new_direction = c.my_direction
+                # Potentially change direction
+                c.move(current_tile.get_out_direction(c.my_direction))
 
-                # If Chuchus current direction is blocked by the tile the direction is changed to the tile's out direction
-                if c.my_direction in current_tile.my_type["block_dirs"]:
-                    new_direction = current_tile.my_type["out_dir"]
+            c.on_update(delta_time)
 
-                c.move(new_direction)
-
-            c.update(delta_time)
-
-        for p in self.players:
-            p.update(delta_time)
+        self.__time_left -= delta_time
 
 
 class MyGame(arcade.Window):
@@ -685,8 +864,9 @@ class MyGame(arcade.Window):
         self.down_pressed = False
 
         # Get list of joysticks
-        joysticks = arcade.get_joysticks()
+        self.joysticks = arcade.get_joysticks()
 
+        """
         if joysticks:
             print("Found {} joystick(s)".format(len(joysticks)))
 
@@ -695,6 +875,8 @@ class MyGame(arcade.Window):
 
             # Communicate with joystick
             self.joystick.open()
+
+            print(self.joystick.get_controls())
 
             # Map joysticks functions to local functions
             self.joystick.on_joybutton_press = self.on_joybutton_press
@@ -705,8 +887,8 @@ class MyGame(arcade.Window):
         else:
             print("No joysticks found")
             self.joystick = None
+        """
 
-            # self.joystick.
         # Set the background color
         arcade.set_background_color(arcade.color.AMAZON)
 
@@ -719,11 +901,16 @@ class MyGame(arcade.Window):
         # No of lives
         self.player_lives = PLAYER_LIVES
 
-        # Start at level 1
-        self.level = 2
+        # Start at this level
+        self.level = 1
 
         self.players = arcade.SpriteList()
-        self.players.append(Player())
+        p = Player()
+        try:
+            p.joystick = self.joysticks[0]
+        except IndexError:
+            print("No joystick to add to Player.")
+        self.players.append(p)
         self.start_level()
 
     def start_level(self):
@@ -731,7 +918,7 @@ class MyGame(arcade.Window):
         assert (
             self.level in MyGame.levels.keys()
         ), f"Error: no data for level {self.level}"
-        self.tile_matrix = TileMatrix(level_data=MyGame.levels[self.level])
+        self.tile_matrix = Level(level_data=MyGame.levels[self.level])
         # Add a player to the game
         for p in self.players:
             p_no = self.tile_matrix.add_player(p, (1, 1))
@@ -750,23 +937,23 @@ class MyGame(arcade.Window):
         # This command has to happen before we start drawing
         arcade.start_render()
 
+        # Draw matrix on screen
+        self.tile_matrix.draw()
+
         # Draw players score on screen
         arcade.draw_text(
-            "SCORE: {}".format(self.player_score),  # Text to show
+            "Time left: {}".format(int(self.tile_matrix.time_left)),
             10,  # X position
             SCREEN_HEIGHT - 20,  # Y positon
             arcade.color.WHITE,  # Color of text
         )
-
-        # Draw matrix on screen
-        self.tile_matrix.draw()
 
     def on_update(self, delta_time):
         """
         Movement and game logic
         """
 
-        self.tile_matrix.update(delta_time)
+        self.tile_matrix.on_update(delta_time)
 
         if self.tile_matrix.level_clear:
             self.end_level()
@@ -777,23 +964,31 @@ class MyGame(arcade.Window):
         """
 
         # Track state of arrow keys
-        # These directions are in level coordinates,
-        # that is y is opposite of screen coordinatesystem.
-        if key == arcade.key.UP:
+        # Move player 0
+        if key == arcade.key.W:
             self.up_pressed = True
-            self.tile_matrix.move_player(0, Direction.UP)
-        elif key == arcade.key.DOWN:
+            self.tile_matrix.move_player(self.players[0], Direction.UP)
+        elif key == arcade.key.S:
             self.down_pressed = True
-            self.tile_matrix.move_player(0, Direction.DOWN)
-        elif key == arcade.key.LEFT:
+            self.tile_matrix.move_player(self.players[0], Direction.DOWN)
+        elif key == arcade.key.A:
             self.left_pressed = True
-            self.tile_matrix.move_player(0, Direction.LEFT)
-        elif key == arcade.key.RIGHT:
+            self.tile_matrix.move_player(self.players[0], Direction.LEFT)
+        elif key == arcade.key.D:
             self.right_pressed = True
-            self.tile_matrix.move_player(0, Direction.RIGHT)
+            self.tile_matrix.move_player(self.players[0], Direction.RIGHT)
 
-        if key == FIRE_KEY:
-            self.tile_matrix.add_annotation(0, Annotation())
+        ad = None
+        if key == arcade.key.UP:
+            ad = Direction.UP
+        elif key == arcade.key.RIGHT:
+            ad = Direction.RIGHT
+        elif key == arcade.key.DOWN:
+            ad = Direction.DOWN
+        elif key == arcade.key.LEFT:
+            ad = Direction.LEFT
+        if ad:
+            self.tile_matrix.add_annotation(self.players[0], ad)
 
     def on_key_release(self, key, modifiers):
         """
@@ -811,8 +1006,6 @@ class MyGame(arcade.Window):
 
     def on_joybutton_press(self, joystick, button_no):
         print("Button pressed:", button_no)
-        # Press the fire key
-        self.on_key_press(FIRE_KEY, [])
 
     def on_joybutton_release(self, joystick, button_no):
         print("Button released:", button_no)
