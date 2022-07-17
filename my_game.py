@@ -7,6 +7,7 @@ Artwork from https://kenney.nl/assets/space-shooter-redux
 
 """
 from enum import Enum, unique, auto
+import math
 from random import choice, randint
 from typing import List, Optional, Union
 import arcade
@@ -20,7 +21,8 @@ TILE_SIZE = TILE_SCALING * 16
 # Time in ms for each keyframe
 CHUCHU_ANIMATION_SPEED = 300
 CHUCHU_NO_OF_TYPES = 5
-
+# The ID of the ChuChu type who triggers an event
+CHUCHU_EVENT_TRIGGER_TYPE = 0
 # Time in seconds between events in a level
 LEVEL_TIME_BETWEEN_EVENTS = 5
 
@@ -142,9 +144,11 @@ class Event(Enum):
     Events in game
     """
 
-    NORMAL = auto()
-    SPEED_UP = auto()
-    SLOW_DOWN = auto()
+    # NORMAL must be the 1st event!
+    NORMAL = {"speed_factor": 1.0, "duration": math.inf}
+    SPEED_UP = {"speed_factor": 2.0, "duration": 10.0}
+    SLOW_DOWN = {"speed_factor": 0.5, "duration": 10.0}
+    PAUSE = {"speed_factor": 0.0, "duration": 5.0}
 
 
 class Player(arcade.Sprite):
@@ -242,7 +246,7 @@ class Tile(arcade.Sprite):
     # The value of Direction keys, are the Directions a ChuChu should move
     # after having entered the tile from the key Direction
     types = {
-        0: {"texture_no": T_TILE_NONE},
+        0: {},
         1: {
             Direction.UP: Direction.RIGHT,
         },
@@ -533,7 +537,9 @@ class Drain(arcade.Sprite):
         self.texture = self.frames[1]
         self.open_time_seconds = DRAIN_OPEN_TIME
         if DEBUG_ON:
-            print(f"I have drained a total number of {self.no_drained} chuchus :D")
+            print(
+                f"Drained a ChuChu of type {chuchu.type}. I have now drained {self.no_drained} chuchus."
+            )
 
     def on_update(self, delta_time):
 
@@ -604,16 +610,8 @@ class Level:
         self.players = arcade.SpriteList()
         self.walls = arcade.SpriteList()
 
-        self.__time_left = level_time_seconds
-        self.__time_to_next_event = LEVEL_TIME_BETWEEN_EVENTS
-
-        # Currents level's events
-        self.event_queue = []
-
-        # Calculate no. of sets of events and normal in the game
-        for e in range(int((level_time_seconds / self.__time_to_next_event) / 2)):
-            # Add events seperated by normal events to the game
-            self.event_queue.extend([choice(list(Event)[1:]), Event.NORMAL])
+        self.__level_time_left = level_time_seconds
+        self.__event_time_left = 0
 
         self.matrix_width = len(level_data["tiles"][0])
         self.matrix_height = len(level_data["tiles"])
@@ -657,7 +655,7 @@ class Level:
         """
         Time left in the level
         """
-        return self.__time_left
+        return self.__level_time_left
 
     @property
     def level_clear(self) -> bool:
@@ -666,35 +664,27 @@ class Level:
         """
 
         # If all Chuchus have been drained
-        if sum([d.no_drained for d in self.drains]) is sum(
-            [e.capacity for e in self.emitters]
-        ):
+        drained = sum([d.no_drained for d in self.drains])
+        capacity = sum([e.capacity for e in self.emitters])
+        if drained == capacity:
+            print("Level clear: All ChuChus drained")
             return True
 
         # Time has expired
-        if self.__time_left <= 0:
+        if self.__level_time_left <= 0:
+            print("Level clear: No more time left")
             return True
 
         # Level is not clear/done
         return False
 
-    def event(self):
+    def event(self, event):
         """
         An event happens
         """
-        if any(self.event_queue):
-            event = self.event_queue.pop(0)
-        else:
-            event = Event.NORMAL
-
-        print(event)
-        if event == Event.SPEED_UP:
-            self.speed_factor = 4.0
-        elif event == Event.SLOW_DOWN:
-            self.speed_factor = 0.25
-        elif event == Event.NORMAL:
-            self.speed_factor = 1.0
-        self.__time_to_next_event = LEVEL_TIME_BETWEEN_EVENTS
+        self.speed_factor = event.value["speed_factor"]
+        self.__event_time_left = event.value["duration"]
+        print("Event occurred:", event)
 
     def get_tile(self, position) -> arcade.Sprite:
         """
@@ -775,14 +765,17 @@ class Level:
         self.players.draw(pixelated=pixelated)
 
     def on_update(self, delta_time):
-        self.__time_to_next_event -= delta_time
-        self.__time_left -= delta_time
-        if self.__time_to_next_event <= 0:
-            self.event()
+        self.__level_time_left -= delta_time
 
+        if self.__event_time_left > 0:
+            self.__event_time_left -= delta_time
+        elif self.__event_time_left < 0:
+            self.__event_time_left = 0
+            self.event(event=Event.NORMAL)
+
+        # Modify delta_time for use with things that can slow down/speed up
         modified_delta_time = delta_time * self.speed_factor
 
-        # Remove expired annotations
         self.annotations.on_update(modified_delta_time)
         self.drains.on_update(modified_delta_time)
         self.players.on_update(delta_time)
@@ -802,12 +795,15 @@ class Level:
             if c.waiting_for_orders is True:
 
                 # Is Chuchu on a drain
-                current_drain = self.get_sprite_from_screen_coordinates(
+                if current_drain := self.get_sprite_from_screen_coordinates(
                     c.position, self.drains
-                )
-                if not current_drain is None:
-                    c.drained()
+                ):
+                    if c.type == CHUCHU_EVENT_TRIGGER_TYPE:
+                        # A random, non NORMAL Event occurs
+                        self.event(choice(list(Event)[1:]))
+
                     current_drain.drained(c)
+                    c.kill()
 
                     # Nothing more to do for this Chuchu
                     break
