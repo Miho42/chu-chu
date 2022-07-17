@@ -384,15 +384,14 @@ class Chuchu(arcade.AnimatedTimeBasedSprite):
 
         type_offset = self.type * (3 * 27)
 
-        match direction:
-            case Direction.UP:
-                texture_nos = (C1_UP1, C1_UP2, C1_UP1, C1_UP3)
-            case Direction.RIGHT:
-                texture_nos = (C1_RIGHT1, C1_RIGHT2, C1_RIGHT1, C1_RIGHT3)
-            case Direction.DOWN:
-                texture_nos = (C1_DOWN1, C1_DOWN2, C1_DOWN1, C1_DOWN3)
-            case Direction.LEFT:
-                texture_nos = (C1_LEFT1, C1_LEFT2, C1_LEFT1, C1_LEFT3)
+        if Direction.UP:
+            texture_nos = (C1_UP1, C1_UP2, C1_UP1, C1_UP3)
+        elif Direction.RIGHT:
+            texture_nos = (C1_RIGHT1, C1_RIGHT2, C1_RIGHT1, C1_RIGHT3)
+        elif Direction.DOWN:
+            texture_nos = (C1_DOWN1, C1_DOWN2, C1_DOWN1, C1_DOWN3)
+        elif Direction.LEFT:
+            texture_nos = (C1_LEFT1, C1_LEFT2, C1_LEFT1, C1_LEFT3)
 
         texture_nos = [n + type_offset for n in texture_nos]
 
