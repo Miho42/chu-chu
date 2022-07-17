@@ -43,6 +43,9 @@ DRAIN_OPEN_TIME = 0.5
 # Annotations will disapear after this many seconds
 ANNOTATION_LIFETIME_SECONDS = 10
 
+# The minimal alpha value to use with fading annotations.
+ANNOTATION_MIN_ALPHA = 0
+
 # The maximum number of sumultanious annotations for a player
 ANNOTATION_MAX_NO = 3
 
@@ -555,12 +558,14 @@ class Annotation(arcade.Sprite):
             Direction.LEFT,
         ).index(self.direction)
 
+        self.max_lifetime = lifetime
         self.lifetime = lifetime
 
     def on_update(self, delta_time):
-        self.lifetime -= delta_time
         if self.lifetime <= 0:
             self.kill()
+        self.alpha = max(255 * self.lifetime / self.max_lifetime, ANNOTATION_MIN_ALPHA)
+        self.lifetime -= delta_time
 
 
 class Level:
