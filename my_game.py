@@ -31,10 +31,8 @@ SCREEN_HEIGHT = 650
 
 # Variables controlling the player
 PLAYER_LIVES = 3
-PLAYER_SPEED_X = 5
 PLAYER_START_X = SCREEN_WIDTH / 2
-PLAYER_START_Y = 50
-PLAYER_SHOT_SPEED = 4
+PLAYER_SPEED = 5.0
 
 # Number of seconds to show alternative texture
 # for drains when a ChuChu has been drained
@@ -159,6 +157,9 @@ class Player(arcade.Sprite):
         # The joystick used to control the player
         self.__joystick = None
 
+        # Multiply this with joystick value to move
+        self.speed_factor = PLAYER_SPEED
+
     @property
     def joystick(self):
         return self.__joystick
@@ -205,24 +206,18 @@ class Player(arcade.Sprite):
         """
         Move the player on joyaxis motion (Integer values)
         """
-        if DEBUG_ON:
-            print(f"Joystick axis: {axis}, value: {value}")
-
-        # assert value in [-1, 0, 1], f"Value '{value}' from joystick motion must be -1, 0 or 1"
-        if value in [-1, 0, 1]:
-            if axis == "hat_x":
-                d = Direction((int(value), 0))
-            else:
-                d = Direction((0, int(value)))
-            if d:
-                self.level.move_player(self, d)
-        else:
-            if DEBUG_ON:
-                print(f"Ignoring invalid joyaxis value '{value}' in Player")
+        if axis == "x":
+            self.change_x = value
+        elif axis == "y":
+            self.change_y = -1 * value
 
     def __on_joyhat_motion(self, joystick, hat_x, hat_y):
         if DEBUG_ON:
             print("Joystick hat ({}, {})".format(hat_x, hat_y))
+
+    def on_update(self, delta_time):
+        self.center_x += self.speed_factor * self.change_x
+        self.center_y += self.speed_factor * self.change_y
 
 
 class Tile(arcade.Sprite):
@@ -539,16 +534,17 @@ class Annotation(arcade.Sprite):
     The Annotation is deleted after <lifetime> seconds.
     """
 
-    def __init__(self, direction: Direction, owner: Player, lifetime, **kwargs):
+    def __init__(
+        self, direction: Direction, owner: Player, tile: Tile, lifetime, **kwargs
+    ):
 
         kwargs["scale"] = TILE_SCALING
-
         # Pass arguments to class arcade.Sprite
         super().__init__(**kwargs)
         self.direction = direction
         self.texture = TEXTURES[A_UP1]
         self.owner = owner
-        self.position = owner.position
+        self.position = tile.position
 
         # Rotate based on direction
         self.angle = -90 * (
@@ -560,6 +556,8 @@ class Annotation(arcade.Sprite):
 
         self.max_lifetime = lifetime
         self.lifetime = lifetime
+        if DEBUG_ON:
+            print("Added annotation for player:", owner)
 
     def on_update(self, delta_time):
         if self.lifetime <= 0:
@@ -696,15 +694,16 @@ class Level:
         if self.get_sprite_from_screen_coordinates(owner.position, self.annotations):
             return None
 
-        # If player has reached the limit, remove oldest Annotation
-        a = [a for a in self.annotations if a.owner == owner]
-        if len(a) >= ANNOTATION_MAX_NO:
-            self.annotations[self.annotations.index(a[0])].kill()
+        # Add new annotation to position of Tile Player center is within
+        if t := arcade.get_sprites_at_point(owner.position, self.tiles):
+            # If player has reached the limit, remove oldest Annotation
+            a = [a for a in self.annotations if a.owner == owner]
+            if len(a) >= ANNOTATION_MAX_NO:
+                self.annotations[self.annotations.index(a[0])].kill()
 
-        # Add new annotation
-        self.annotations.append(
-            Annotation(direction, owner, ANNOTATION_LIFETIME_SECONDS)
-        )
+            self.annotations.append(
+                Annotation(direction, owner, t[0], ANNOTATION_LIFETIME_SECONDS)
+            )
 
     def get_sprite_from_screen_coordinates(self, coordinates, sprite_list):
         """
@@ -734,6 +733,7 @@ class Level:
         # Remove expired annotations
         self.annotations.on_update(delta_time)
         self.drains.on_update(delta_time)
+        self.players.on_update(delta_time)
 
         # Pull ChuChus from emitters
         for e in self.emitters:
@@ -865,29 +865,6 @@ class MyGame(arcade.Window):
 
         # Get list of joysticks
         self.joysticks = arcade.get_joysticks()
-
-        """
-        if joysticks:
-            print("Found {} joystick(s)".format(len(joysticks)))
-
-            # Use 1st joystick found
-            self.joystick = joysticks[0]
-
-            # Communicate with joystick
-            self.joystick.open()
-
-            print(self.joystick.get_controls())
-
-            # Map joysticks functions to local functions
-            self.joystick.on_joybutton_press = self.on_joybutton_press
-            self.joystick.on_joybutton_release = self.on_joybutton_release
-            self.joystick.on_joyaxis_motion = self.on_joyaxis_motion
-            self.joystick.on_joyhat_motion = self.on_joyhat_motion
-
-        else:
-            print("No joysticks found")
-            self.joystick = None
-        """
 
         # Set the background color
         arcade.set_background_color(arcade.color.AMAZON)
