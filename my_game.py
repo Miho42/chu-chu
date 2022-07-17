@@ -374,9 +374,11 @@ class Chuchu(arcade.AnimatedTimeBasedSprite):
             self.my_destination_screen_coordinates[1] - self.center_y
         ) / self.my_speed
 
-        self.frames = self.get_keyframes(
-            self.my_direction
-        )  # Chuchu.frames[self.my_direction]
+        self.frames = self.get_keyframes(self.my_direction)
+        # Force update of texture by setting animation timer very high
+        self.time_counter = 100
+        # Go to random texture in new frames
+        self.cur_frame_idx = randint(0, len(self.frames) - 1)
 
         self.waiting_for_orders = False
 
@@ -597,6 +599,9 @@ class Level:
         self.matrix_offset_x = matrix_offset_x
         self.matrix_offset_y = matrix_offset_y
 
+        # Manipulate-game-speed-factor
+        self.speed_factor = 1.0
+
         # Add Tile objects with correct screen positions
         new_tile_x = matrix_offset_x
         new_tile_y = matrix_offset_y + (self.matrix_height - 1) * tile_size
@@ -730,6 +735,7 @@ class Level:
         self.players.draw(pixelated=pixelated)
 
     def on_update(self, delta_time):
+        delta_time *= self.speed_factor
 
         # Remove expired annotations
         self.annotations.on_update(delta_time)
